@@ -2,7 +2,7 @@ package skiverse;
 
 public class Particle {
 
-    public Term term;
+    public Atom term;
 
     public double x;
     public double y;

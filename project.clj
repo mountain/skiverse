@@ -8,6 +8,8 @@
 
   :dependencies [[org.clojure/clojure "1.10.1"]
 
+                 [net.mikera/vectorz "0.67.0"]
+
                  [org.clojure/tools.logging "1.0.0"]
                  [org.slf4j/slf4j-api "1.7.30"]
                  [log4j/log4j "1.2.17"]
