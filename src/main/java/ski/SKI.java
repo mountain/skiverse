@@ -84,7 +84,6 @@ interface SKI {
             Context ctx = this.stream(1);
             return switch(ctx.script()) {
                 case "(I, $1)" -> ctx.get("$1").eval();
-                case "((I, $1), $2)" -> cons(ctx.get("$1").eval(), ctx.get("$2").eval()).eval();
                 case "(ι, $1)" -> cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval();
                 case "((ι, $1), $2)" -> cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval();
                 default  -> {
