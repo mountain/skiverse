@@ -66,6 +66,30 @@ class SKITest {
     }
 
     @Test
+    void testIota2() {
+        Combinator iota2 = cons(iota(), iota());
+        Combinator fml = cons(iota2, var("x"));
+        assertEquals("(ι, ι)", iota2.script());
+        assertEquals("x", fml.eval().script());
+    }
+
+    @Test
+    void testIota4() {
+        Combinator iota4 = cons(iota(), cons(iota(), cons(iota(), iota())));
+        Combinator fml = cons(cons(iota4, var("x")), var("y"));
+        assertEquals("(ι, (ι, (ι, ι)))", iota4.script());
+        assertEquals("x", fml.eval().script());
+    }
+
+    @Test
+    void testIota5() {
+        Combinator iota5 = cons(iota(), cons(iota(), cons(iota(), cons(iota(), iota()))));
+        Combinator fml = cons(cons(cons(iota5, var("x")), var("y")), var("z"));
+        assertEquals("(ι, (ι, (ι, (ι, ι))))", iota5.script());
+        assertEquals("((x, z), (y, z))", fml.eval().script());
+    }
+
+    @Test
     void testSelfApplication() {
         Combinator sksii = cons(cons(S(), cons(K(), var("x"))), cons(cons(S(), I()), I()));
         Combinator selfappl = cons(sksii, sksii);

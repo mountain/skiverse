@@ -86,7 +86,7 @@ interface SKI {
                 case "(I, $1)" -> ctx.get("$1").eval();
                 case "((I, $1), $2)" -> cons(ctx.get("$1").eval(), ctx.get("$2").eval()).eval();
                 case "(ι, $1)" -> cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval();
-                case "((ι, $1), $2)" -> cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval());
+                case "((ι, $1), $2)" -> cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval();
                 default  -> {
                     ctx = this.stream(2);
                     yield switch (ctx.script()) {
@@ -109,6 +109,8 @@ interface SKI {
                                     yield cons(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval(), $4).eval();
                                 }
                                 case "(((((K, K), $1), $2), $3), $4)" -> cons(ctx.get("$2").eval(), ctx.get("$4").eval()).eval();
+                                case "(((ι, $1), $2), $3)" -> cons(cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval(), ctx.get("$3").eval()).eval();
+                                case "((((ι, $1), $2), $3), $4)" -> cons(cons(cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval(), ctx.get("$3").eval()).eval(), ctx.get("$4").eval()).eval();
                                 default -> this;
                             };
                         }
