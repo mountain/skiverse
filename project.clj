@@ -33,10 +33,10 @@
                  [clj-pid "0.1.2"]
                  [clj-sub-command "0.6.0"]
 
-                 [junit "4.13" :scope "tests"]]
+                 [org.junit.jupiter/junit-jupiter "5.4.2" :scope "tests"]]
 
   :jvm-opts ["-Xms1g" "-Xmx5g" "-server"]
-  :javac-options ["-target" "1.8" "-source" "1.8" "-Xlint:-options"]
+  :javac-options ["-target" "1.8" "-source" "1.14" "-Xlint:-options"]
   :omit-source true
 
   :source-paths ["src/main/clojure"]
