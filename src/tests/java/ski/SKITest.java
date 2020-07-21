@@ -93,6 +93,7 @@ class SKITest {
     void testReplicate() {
         Combinator sksii = cons(cons(S(), cons(K(), var("x"))), cons(cons(S(), I()), I()));
         Combinator selfappl = cons(sksii, var("y"));
+        assertEquals("((S, (K, x)), ((S, I), I))", sksii.script());
         assertEquals("(x, (y, y))", selfappl.eval().script());
     }
 
