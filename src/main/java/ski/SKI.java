@@ -6,7 +6,7 @@ interface SKI {
 
     interface Combinator {
         String script();
-        Context stream(int maxdepth);
+        Context tokenize(int maxdepth);
         Combinator eval();
     }
 
@@ -71,7 +71,7 @@ interface SKI {
         }
 
         @Override
-        public Context stream(int maxdepth) {
+        public Context tokenize(int maxdepth) {
             Context ctx = new Context(maxdepth);
             ctx.visitLeft(left, 1);
             ctx.visitRoot();
@@ -81,18 +81,18 @@ interface SKI {
 
         @Override
         public Combinator eval() {
-            Context ctx = this.stream(1);
+            Context ctx = this.tokenize(1);
             return switch(ctx.script()) {
                 case "(I, $1)" -> ctx.get("$1").eval();
                 case "(ι, $1)" -> cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval();
                 case "((ι, $1), $2)" -> cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval();
                 default  -> {
-                    ctx = this.stream(2);
+                    ctx = this.tokenize(2);
                     yield switch (ctx.script()) {
                         case "((K, $1), $2)" -> ctx.get("$1").eval();
                         case "(((K, $1), $2), $3)" -> cons(ctx.get("$1").eval(), ctx.get("$3").eval()).eval();
                         default -> {
-                            ctx = this.stream(3);
+                            ctx = this.tokenize(3);
                             yield switch (ctx.script()) {
                                 case "(((S, $1), $2), $3)" -> {
                                     Combinator $1 = ctx.get("$1").eval();
@@ -132,7 +132,7 @@ interface SKI {
             }
 
             @Override
-            public Context stream(int maxdepth) {
+            public Context tokenize(int maxdepth) {
                 return null;
             }
 
@@ -153,7 +153,7 @@ interface SKI {
             }
 
             @Override
-            public Context stream(int maxdepth) {
+            public Context tokenize(int maxdepth) {
                 return null;
             }
 
@@ -174,7 +174,7 @@ interface SKI {
             }
 
             @Override
-            public Context stream(int maxdepth) {
+            public Context tokenize(int maxdepth) {
                 return null;
             }
 
@@ -195,7 +195,7 @@ interface SKI {
             }
 
             @Override
-            public Context stream(int maxdepth) {
+            public Context tokenize(int maxdepth) {
                 return null;
             }
 
@@ -216,7 +216,7 @@ interface SKI {
             }
 
             @Override
-            public Context stream(int maxdepth) {
+            public Context tokenize(int maxdepth) {
                 return null;
             }
 
