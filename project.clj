@@ -9,6 +9,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
 
                  [net.mikera/vectorz "0.67.0"]
+                 [org.joml/joml "1.9.11"]
 
                  [org.clojure/tools.logging "1.0.0"]
                  [org.slf4j/slf4j-api "1.7.30"]
@@ -21,7 +22,7 @@
   :omit-source true
 
   :source-paths ["src/main/clojure"]
-  :java-source-paths ["src/main/java"]
+  :java-source-paths ["src/main/java" "src/tests/java/"]
   :resource-paths ["src/main/resources"]
   :test-paths ["src/tests/java/"]
   :test-selectors {:default (complement :integration)
