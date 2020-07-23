@@ -2,9 +2,10 @@ package ski;
 
 import java.util.HashMap;
 
-interface SKI {
+public interface SKI {
 
     interface Combinator {
+        double mass();
         String script();
         Context tokenize(int maxdepth);
         Combinator eval();
@@ -63,6 +64,11 @@ interface SKI {
         CompositiveCombinator(Combinator left, Combinator right) {
             this.left = left;
             this.right = right;
+        }
+
+        @Override
+        public double mass() {
+            return left.mass() + right.mass();
         }
 
         @Override
@@ -127,6 +133,11 @@ interface SKI {
         return new Combinator() {
 
             @Override
+            public double mass() {
+                return 0;
+            }
+
+            @Override
             public String script() {
                 return name;
             }
@@ -146,6 +157,11 @@ interface SKI {
 
     static Combinator S() {
         return new Combinator() {
+
+            @Override
+            public double mass() {
+                return 5;
+            }
 
             @Override
             public String script() {
@@ -169,6 +185,11 @@ interface SKI {
         return new Combinator() {
 
             @Override
+            public double mass() {
+                return 4;
+            }
+
+            @Override
             public String script() {
                 return "K";
             }
@@ -190,6 +211,11 @@ interface SKI {
         return new Combinator() {
 
             @Override
+            public double mass() {
+                return 2;
+            }
+
+            @Override
             public String script() {
                 return "I";
             }
@@ -209,6 +235,11 @@ interface SKI {
 
     static Combinator iota() {
         return new Combinator() {
+
+            @Override
+            public double mass() {
+                return 1;
+            }
 
             @Override
             public String script() {
