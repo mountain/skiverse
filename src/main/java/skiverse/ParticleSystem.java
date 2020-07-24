@@ -210,8 +210,8 @@ public class ParticleSystem {
         }
         combinators.set(i, result);
 
-        double lmass = mass.get(icollision);
-        double rmass = mass.get(jcollision);
+        //double lmass = mass.get(icollision);
+        //double rmass = mass.get(jcollision);
         double lknct = knct.get(icollision);
         double rknct = knct.get(jcollision);
         double lpotn = potn.get(icollision);
@@ -278,7 +278,7 @@ public class ParticleSystem {
         double prob = injectRate / numOfParticles;
         for (int i = 0; i < numOfParticles; i++) {
             if(Math.random() < prob) {
-                addIota();
+                //addIota();
             }
         }
     }

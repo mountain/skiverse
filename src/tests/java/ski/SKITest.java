@@ -98,6 +98,14 @@ class SKITest {
     }
 
     @Test
+    void testReplicate2() {
+        Combinator replicator = cons(cons(S(), cons(K(), I())), cons(cons(S(), I()), I()));
+        Combinator fml = cons(replicator, cons(cons(S(), I()), I()));
+        assertEquals("((S, (K, I)), ((S, I), I))", replicator.script());
+        assertEquals("(x, (y, y))", fml.eval().script());
+    }
+
+    @Test
     void testSelfApplication() {
         Combinator replicator = cons(cons(S(), cons(K(), var("x"))), cons(cons(S(), I()), I()));
         Combinator selfappl = cons(replicator, replicator);
