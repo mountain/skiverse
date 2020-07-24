@@ -132,6 +132,15 @@ public interface SKI {
                     ctx = this.tokenize(1);
                     String script1 = ctx.script();
                     yield switch (script1) {
+                        case "((I, $1), $2)" -> {
+                            Combinator $1 = ctx.get("$1");
+                            Combinator $2 = ctx.get("$2");
+                            if(detector.commit(this.script())) {
+                                yield check(cons($1.eval(), $2.eval()).eval());
+                            } else {
+                                yield check(cons($1.eval(), $2.eval()));
+                            }
+                        }
                         case "((K, $1), $2)" -> check(ctx.get("$1"));
                         case "((ι, $1), $2)" -> {
                             Combinator $1 = ctx.get("$1");
@@ -143,9 +152,9 @@ public interface SKI {
                             String script2 = ctx.script();
                             yield switch (script2) {
                                 case "(((S, $1), $2), $3)" -> {
-                                    Combinator $1 = ctx.get("$1").eval();
-                                    Combinator $2 = ctx.get("$2").eval();
-                                    Combinator $3 = ctx.get("$3").eval();
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $2 = ctx.get("$2");
+                                    Combinator $3 = ctx.get("$3");
                                     if(detector.commit(this.script())) {
                                         yield check(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval());
                                     } else {
@@ -163,12 +172,23 @@ public interface SKI {
                                     Combinator $3 = ctx.get("$3");
                                     yield check(cons(cons(cons(cons($1, S()).eval(), K()).eval(), $2).eval(), $3).eval());
                                 }
-                                case "((($1, $2), $3), $4)" -> {
+                                case "(($1, $2), ($3, $4))" -> {
                                     Combinator $1 = ctx.get("$1");
                                     Combinator $2 = ctx.get("$2");
                                     Combinator $3 = ctx.get("$3");
                                     Combinator $4 = ctx.get("$4");
-                                    yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()).eval());
+                                    yield check(cons(cons($1, $2).eval(), cons($3, $4).eval()).eval());
+                                }
+                                case "((($1, $2), $3), $4)" -> {
+                                    Combinator $1 = ctx.get("$1").eval();
+                                    Combinator $2 = ctx.get("$2");
+                                    Combinator $3 = ctx.get("$3");
+                                    Combinator $4 = ctx.get("$4");
+                                    if(detector.commit(this.script())) {
+                                        yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()).eval());
+                                    } else {
+                                        yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()));
+                                    }
                                 }
                                 default -> this;
                             };

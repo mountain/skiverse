@@ -75,7 +75,7 @@ public class ParticleSystem {
 
     public static void init() {
         fillRandom(flag, new Date().getTime());
-        flag.multiply(2);
+        flag.multiply(4);
         flag.sub(1);
 
         fillRandom(pos, new Date().getTime());

@@ -66,6 +66,13 @@ class SKITest {
     }
 
     @Test
+    void testIIII() {
+        Combinator iiii = cons(cons(I(), I()), cons(I(), I()));
+        assertEquals("((I, I), (I, I))", iiii.script());
+        assertEquals("I", iiii.eval().script());
+    }
+
+    @Test
     void testIota2() {
         Combinator iota2 = cons(iota(), iota());
         Combinator fml = cons(iota2, var("x"));
