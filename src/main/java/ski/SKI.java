@@ -185,7 +185,7 @@ public interface SKI {
                                     Combinator $3 = ctx.get("$3");
                                     Combinator $4 = ctx.get("$4");
                                     if(detector.commit(this.script())) {
-                                        yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()).eval());
+                                        yield check(cons(cons(cons($1, $2), $3).eval(), $4).eval());
                                     } else {
                                         yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()));
                                     }
