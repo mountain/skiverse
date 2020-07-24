@@ -1,8 +1,21 @@
 package ski;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 public interface SKI {
+
+    class Detector extends HashMap<Thread, HashSet<String>> {
+        public boolean commit(String script) {
+            Thread cur = Thread.currentThread();
+            if (!this.containsKey(cur)) {
+                this.put(cur, new HashSet<>());
+            }
+            return this.get(cur).add(script);
+        }
+    }
+
+    Detector detector = new Detector();
 
     interface Combinator {
         double mass();
@@ -32,16 +45,19 @@ public interface SKI {
 
         public void visitLeft(Combinator left, int curdepth) {
             this.snippet.append("(");
-            if (curdepth <= this.maxdepth && left instanceof CompositiveCombinator comp) {
-                this.visitLeft(comp.left, curdepth + 1);
-                this.visitRoot();
-                this.visitRight(comp.right);
-            } else {
-                if (left instanceof CompositiveCombinator comp) {
-
+            if (left instanceof CompositiveCombinator comp) {
+                if (curdepth <= this.maxdepth) {
+                    this.visitLeft(comp.left, curdepth + 1);
+                    this.visitRoot();
+                    this.visitRight(comp.right);
                 } else {
-                    this.snippet.append(left.script());
+                    String key = String.format("$%d", this.counter);
+                    this.snippet.append(key);
+                    this.put(key, left);
+                    this.counter++;
                 }
+            } else {
+                this.snippet.append(left.script());
             }
         }
 
@@ -63,9 +79,6 @@ public interface SKI {
     class CompositiveCombinator implements Combinator {
         public final Combinator left;
         public final Combinator right;
-
-        private int counter = 1;
-        double enrg = 0;
 
         CompositiveCombinator(Combinator left, Combinator right) {
             this.left = left;
@@ -92,53 +105,71 @@ public interface SKI {
         }
 
         protected Combinator check(Combinator val) {
-            String a = this.script();
-            String b = val.script();
+            String sa = this.script();
+            String sb = val.script();
             double ma = this.mass();
             double mb = val.mass();
 
-            if (this.mass() >= val.mass()) {
+            //return val;
+            if (ma > mb) {
                 return val;
-            } else {
-                return this;
+            } else if (ma == mb) {
+                if (!sa.equals(sb)) {
+                    return val;
+                }
             }
+            return this;
         }
 
         @Override
         public Combinator eval() {
-            Combinator val;
-            Context ctx = this.tokenize(1);
-            String script1 = ctx.script();
-            return switch(script1) {
-                case "(I, $1)" -> check(ctx.get("$1").eval());
+            Context ctx = this.tokenize(0);
+            String script0 = ctx.script();
+            return switch(script0) {
+                case "(I, $1)" -> check(ctx.get("$1"));
                 case "(ι, $1)" -> check(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval());
-                //case "((ι, $1), $2)" -> check(cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval());
                 default  -> {
-                    ctx = this.tokenize(2);
-                    String script2 = ctx.script();
-                    yield switch (script2) {
-                        case "((K, $1), $2)" -> check(ctx.get("$1").eval());
-                        //case "(((K, $1), $2), $3)" -> check(cons(ctx.get("$1").eval(), ctx.get("$3").eval()).eval());
+                    ctx = this.tokenize(1);
+                    String script1 = ctx.script();
+                    yield switch (script1) {
+                        case "((K, $1), $2)" -> check(ctx.get("$1"));
+                        case "((ι, $1), $2)" -> {
+                            Combinator $1 = ctx.get("$1");
+                            Combinator $2 = ctx.get("$2");
+                            yield check(cons(cons(cons($1, S()).eval(), K()).eval(), $2).eval());
+                        }
                         default -> {
-                            ctx = this.tokenize(3);
-                            String script3 = ctx.script();
-                            yield switch (script3) {
+                            ctx = this.tokenize(2);
+                            String script2 = ctx.script();
+                            yield switch (script2) {
                                 case "(((S, $1), $2), $3)" -> {
                                     Combinator $1 = ctx.get("$1").eval();
                                     Combinator $2 = ctx.get("$2").eval();
                                     Combinator $3 = ctx.get("$3").eval();
-                                    yield check(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval());
+                                    if(detector.commit(this.script())) {
+                                        yield check(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval());
+                                    } else {
+                                        yield check(cons(cons($1, $3), cons($2, $3)).eval());
+                                    }
                                 }
-                                //case "((((S, $1), $2), $3), $4)" -> {
-                                //    Combinator $1 = ctx.get("$1").eval();
-                                //    Combinator $2 = ctx.get("$2").eval();
-                                //    Combinator $3 = ctx.get("$3").eval();
-                                //    Combinator $4 = ctx.get("$4").eval();
-                                //    yield check(cons(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval(), $4).eval());
-                                //}
-                                //case "(((((K, K), $1), $2), $3), $4)" -> check(cons(ctx.get("$2").eval(), ctx.get("$4").eval()).eval());
-                                //case "(((ι, $1), $2), $3)" -> check(cons(cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval(), ctx.get("$3").eval()).eval());
-                                //case "((((ι, $1), $2), $3), $4)" -> check(cons(cons(cons(cons(cons(ctx.get("$1").eval(), S()).eval(), K()).eval(), ctx.get("$2").eval()).eval(), ctx.get("$3").eval()).eval(), ctx.get("$4").eval()).eval());
+                                case "(((K, $1), $2), $3)" -> {
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $3 = ctx.get("$3");
+                                    yield check(cons($1, $3).eval());
+                                }
+                                case "(((ι, $1), $2), $3)" -> {
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $2 = ctx.get("$2");
+                                    Combinator $3 = ctx.get("$3");
+                                    yield check(cons(cons(cons(cons($1, S()).eval(), K()).eval(), $2).eval(), $3).eval());
+                                }
+                                case "((($1, $2), $3), $4)" -> {
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $2 = ctx.get("$2");
+                                    Combinator $3 = ctx.get("$3");
+                                    Combinator $4 = ctx.get("$4");
+                                    yield check(cons(cons(cons($1, $2), $3).eval(), $4.eval()).eval());
+                                }
                                 default -> this;
                             };
                         }
@@ -154,7 +185,6 @@ public interface SKI {
 
     static Combinator var(String name) {
         return new Combinator() {
-            double enrg = 0;
 
             @Override
             public double mass() {
@@ -181,7 +211,6 @@ public interface SKI {
 
     static Combinator S() {
         return new Combinator() {
-            double enrg = 0;
 
             @Override
             public double mass() {
@@ -208,7 +237,6 @@ public interface SKI {
 
     static Combinator K() {
         return new Combinator() {
-            double enrg = 0;
 
             @Override
             public double mass() {
@@ -235,7 +263,6 @@ public interface SKI {
 
     static Combinator I() {
         return new Combinator() {
-            double enrg = 0;
 
             @Override
             public double mass() {
@@ -262,7 +289,6 @@ public interface SKI {
 
     static Combinator iota() {
         return new Combinator() {
-            double enrg = 0;
 
             @Override
             public double mass() {
