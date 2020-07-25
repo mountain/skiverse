@@ -151,6 +151,21 @@ public interface SKI {
                             ctx = this.tokenize(2);
                             String script2 = ctx.script();
                             yield switch (script2) {
+                                case "(((I, $1), $2), $3)" -> {
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $2 = ctx.get("$2");
+                                    Combinator $3 = ctx.get("$3");
+                                    if(detector.commit(this.script())) {
+                                        yield check(cons(cons($1.eval(), $2.eval()).eval(), $3.eval()).eval());
+                                    } else {
+                                        yield check(cons(cons($1.eval(), $2), $3));
+                                    }
+                                }
+                                case "(((K, $1), $2), $3)" -> {
+                                    Combinator $1 = ctx.get("$1");
+                                    Combinator $3 = ctx.get("$3");
+                                    yield check(cons($1, $3).eval());
+                                }
                                 case "(((S, $1), $2), $3)" -> {
                                     Combinator $1 = ctx.get("$1");
                                     Combinator $2 = ctx.get("$2");
@@ -160,11 +175,6 @@ public interface SKI {
                                     } else {
                                         yield check(cons(cons($1, $3), cons($2, $3)).eval());
                                     }
-                                }
-                                case "(((K, $1), $2), $3)" -> {
-                                    Combinator $1 = ctx.get("$1");
-                                    Combinator $3 = ctx.get("$3");
-                                    yield check(cons($1, $3).eval());
                                 }
                                 case "(((ι, $1), $2), $3)" -> {
                                     Combinator $1 = ctx.get("$1");

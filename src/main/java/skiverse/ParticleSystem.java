@@ -22,8 +22,8 @@ public class ParticleSystem {
 
     static double width = 64;
     static int numOfParticles = 8192;
-    static double injectRate = 1.0;
-    static double escapeProb = 0.99;
+    static double injectRate = 16.0;
+    static double escapeProb = 0.90;
 
     static INDArray flag = newArray(numOfParticles);
     static INDArray mass = newArray(numOfParticles);
@@ -210,8 +210,8 @@ public class ParticleSystem {
         }
         combinators.set(i, result);
 
-        //double lmass = mass.get(icollision);
-        //double rmass = mass.get(jcollision);
+        double lmass = mass.get(icollision);
+        double rmass = mass.get(jcollision);
         double lknct = knct.get(icollision);
         double rknct = knct.get(jcollision);
         double lpotn = potn.get(icollision);
@@ -224,13 +224,13 @@ public class ParticleSystem {
         double zknct = zmass * zvsq / 2;
         double zpotn = potn.get(icollision) + potn.get(jcollision) + knct.get(icollision) + knct.get(jcollision) - zknct;
 
-        //double mloss = lmass + rmass - zmass;
-        //for(int k = 0; k < mloss; k++) {
-        //    addIota();
-        //}
-        //for (int k = 0; k < zpotn; k++) {
-        //    addIota();
-        //}
+        double mloss = lmass + rmass - zmass;
+        for(int k = 0; k < mloss; k++) {
+            addIota();
+        }
+        for (int k = 0; k < zpotn; k++) {
+            addIota();
+        }
 
         combinators.set(i, result);
         mass.set(i, zmass);
@@ -278,16 +278,19 @@ public class ParticleSystem {
         double prob = injectRate / numOfParticles;
         for (int i = 0; i < numOfParticles; i++) {
             if(Math.random() < prob) {
-                //addIota();
+                addIota();
             }
         }
     }
 
     public static void escapeIota() {
         for (int i = 0; i < numOfParticles; i++) {
-            if (flag.get(i) > 0 && combinators.get(i).script().equals("ι")) {
-                if(Math.random() < escapeProb) {
-                    flag.set(i, -1);
+            if (flag.get(i) > 0) {
+                String script = combinators.get(i).script();
+                if (!script.contains("S") && !script.contains("K") && !script.contains("I")) {
+                    if (Math.random() < escapeProb) {
+                        flag.set(i, -1);
+                    }
                 }
             }
         }

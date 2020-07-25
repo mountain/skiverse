@@ -66,10 +66,38 @@ class SKITest {
     }
 
     @Test
+    void testII() {
+        Combinator ii = cons(I(), I());
+        assertEquals("(I, I)", ii.script());
+        assertEquals("I", ii.eval().script());
+    }
+
+    @Test
+    void testIII() {
+        Combinator iii = cons(cons(I(), I()), I());
+        assertEquals("((I, I), I)", iii.script());
+        assertEquals("I", iii.eval().script());
+    }
+
+    @Test
     void testIIII() {
         Combinator iiii = cons(cons(I(), I()), cons(I(), I()));
         assertEquals("((I, I), (I, I))", iiii.script());
         assertEquals("I", iiii.eval().script());
+    }
+
+    @Test
+    void testIIIII() {
+        Combinator iiiii = cons(cons(cons(I(), I()), cons(I(), I())), I());
+        assertEquals("(((I, I), (I, I)), I)", iiiii.script());
+        assertEquals("I", iiiii.eval().script());
+    }
+
+    @Test
+    void testIIIIII() {
+        Combinator iiiiii = cons(cons(cons(I(), I()), cons(I(), I())), cons(I(), I()));
+        assertEquals("(((I, I), (I, I)), (I, I))", iiiiii.script());
+        assertEquals("I", iiiiii.eval().script());
     }
 
     @Test
