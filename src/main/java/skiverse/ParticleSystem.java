@@ -23,8 +23,11 @@ public class ParticleSystem {
 
     static double width = 64;
     static int numOfParticles = 8192;
+    static double emmitRate = 20.0; // platonic dodecahedron: the edge length is greater than the radius
     static double injectRate = 128.0;
     static double escapeProb = 0.80;
+    static double collisionThreshhold = 0.1;
+    static double avergespeed = 0.0;
 
     static INDArray flag = newArray(numOfParticles);
     static INDArray mass = newArray(numOfParticles);
@@ -36,6 +39,8 @@ public class ParticleSystem {
 
     static AABBTree<Entity> tree = new AABBTree<Entity>();
     static List<CollisionPair<Entity>> collisionPairs = new ArrayList<CollisionPair<Entity>>(numOfParticles / 10);
+
+    static Map<Integer, Deque<Emission>> emissionQueues = new HashMap<>();
 
     static List<SKI.Combinator> combinators = new ArrayList<SKI.Combinator>(numOfParticles);
     static Map<String, Integer> countMap = new HashMap<String, Integer>();
@@ -61,10 +66,12 @@ public class ParticleSystem {
             if (dest == null) {
                 dest = new AABBf();
             }
+
+            double thresh = collisionThreshhold / avergespeed;
             INDArray p = pos.slice(0, this.idx);
             INDArray v = velo.slice(0, this.idx);
             dest.setMin((float)p.get(0), (float)p.get(1), (float)p.get(2));
-            dest.setMax((float)(p.get(0) + v.get(0) * 0.2), (float)(p.get(1) + v.get(1) * 0.2), (float)(p.get(2) + v.get(2) * 0.2));
+            dest.setMax((float)(p.get(0) + v.get(0) * thresh), (float)(p.get(1) + v.get(1) * thresh), (float)(p.get(2) + v.get(2) * thresh));
             return dest;
         }
 
@@ -88,21 +95,29 @@ public class ParticleSystem {
 
         for (int i = 0; i < numOfParticles; i++) {
             combinators.add(null);
-            if (flag.get(i) < 0) continue;
+        }
 
-            switch (i % 3) {
-                case 0: combinators.set(i, SKI.I()); break;
-                case 1: combinators.set(i, SKI.K()); break;
-                case 2: combinators.set(i, SKI.S()); break;
+        for (int i = 0; i < numOfParticles; i++) {
+            if (flag.get(i) < 0) {
+                mass.set(i, 0.0);
+                potn.set(i, 0.0);
+                knct.set(i, 0.0);
+                mmnt.slice(0, i).scale(0);
+            } else {
+                switch (i % 3) {
+                    case 0: combinators.set(i, SKI.I()); break;
+                    case 1: combinators.set(i, SKI.K()); break;
+                    case 2: combinators.set(i, SKI.S()); break;
+                }
+
+                Vector3 ivelo = Vector3.create(velo.slice(0, i));
+                double vsq = ivelo.dotProduct(ivelo);
+                double m = combinators.get(i).mass();
+                mass.set(i, m);
+                potn.set(i, 0.0);
+                knct.set(i, m * vsq / 2);
+                mmnt.slice(0, i).set(ivelo.scaleCopy(m));
             }
-
-            Vector3 ivelo = Vector3.create(velo.slice(0, i));
-            double vsq = ivelo.dotProduct(ivelo);
-            double m = combinators.get(i).mass();
-            mass.set(i, m);
-            potn.set(i, 0.0);
-            knct.set(i, m * vsq / 2);
-            mmnt.slice(0, i).set(ivelo.scaleCopy(m));
         }
     }
 
@@ -115,12 +130,17 @@ public class ParticleSystem {
             }
         }
         tree.detectCollisionPairs(collisionPairs);
+
+        avergespeed = Math.sqrt(knct.elementSum() / mass.elementSum() * 2);
     }
 
     public static void addIota(Vector3 position) {
         int i = 0;
-        for (; i<numOfParticles; i++) {
+        for (; i < numOfParticles; i++) {
             if (flag.get(i) < 0) break;
+        }
+        if (i >= numOfParticles) {
+            return;
         }
 
         INDArray apos = pos.slice(0, i);
@@ -142,20 +162,31 @@ public class ParticleSystem {
         double vsq = avelo.dotProduct(avelo);
         double m = combinators.get(i).mass();
         mass.set(i, m);
-        potn.set(i, 0.0);
         knct.set(i, m * vsq / 2);
         mmnt.slice(0, i).set(avelo.scaleCopy(m));
 
-        flag.set(i, 1.0);
+        if (position == null) {
+            potn.set(i, 0.0);
+        } else {
+            potn.set(i, -m * vsq / 2);
+        }
+
+        flag.set(i, 0.0);
         lastt = t;
     }
 
     public static void freefly(double mdt) {
         for(int m = 0; m < numOfParticles; m++) {
-            for(int n = 0; n < 3; n++) {
-                if(flag.get(m) > 0.0) {
+            for (int n = 0; n < 3; n++) {
+                if (flag.get(m) > 0.0) {
                     pos.set(m, n, (pos.get(m, n) + velo.get(m, n) * mdt + width) % width);
                 }
+            }
+            if (flag.get(m) < collisionThreshhold) {
+                Vector3 v = Vector3.create(velo.slice(0, m));
+                v.scaleCopy(mindt);
+                double ds = Math.sqrt(v.dotProduct(v));
+                flag.set(m, flag.get(m) + ds);
             }
         }
     }
@@ -207,7 +238,10 @@ public class ParticleSystem {
     public static void collisionMerge() {
         SKI.Combinator left = combinators.get(icollision);
         SKI.Combinator right = combinators.get(jcollision);
-        SKI.Combinator result = SKI.cons(left, right).eval();
+
+        if (left == null || right == null || flag.get(icollision) < 0.0 || flag.get(jcollision) < 0.0) {
+            return;
+        }
 
         flag.set(icollision, -1);
         flag.set(jcollision, -1);
@@ -216,6 +250,11 @@ public class ParticleSystem {
         for (; i<numOfParticles; i++) {
             if (flag.get(i) < 0) break;
         }
+        if (i >= numOfParticles) {
+            return;
+        }
+
+        SKI.Combinator result = SKI.cons(left, right).eval();
         combinators.set(i, result);
 
         double lmass = mass.get(icollision);
@@ -237,16 +276,14 @@ public class ParticleSystem {
         Vector3 zpos = ipos.addCopy(jpos);
         zpos.scale(0.5);
 
-        double mloss = lmass + rmass - zmass;
-        for(int k = 0; k < mloss; k++) {
-            addIota(zpos);
-        }
+        zpotn = lmass + rmass - zmass + zpotn;
+        if (zpotn > 0) {
+            Deque<Emission> queue = new ArrayDeque();
+            emissionQueues.put(i, queue);
+            queue.add(() -> {
 
-        int k = 0;
-        for (; k < zpotn; k++) {
-            addIota(zpos);
+            });
         }
-        zpotn = zpotn - k;
 
         combinators.set(i, result);
         mass.set(i, zmass);
@@ -283,7 +320,7 @@ public class ParticleSystem {
         System.out.println("time %f".formatted(t));
         countMap.clear();
         for (int l = 0; l < numOfParticles; l++) {
-            if (flag.get(l) > 0) {
+            if (flag.get(l) >= 0.0 && combinators.get(l) != null) {
                 String key = combinators.get(l).script();
                 if (!countMap.containsKey(key)) {
                     countMap.put(key, 1);
@@ -301,48 +338,37 @@ public class ParticleSystem {
         System.out.println("------------------------------------------------------------------");
     }
 
-    public static void injectIota() {
-        double prob = injectRate / numOfParticles;
-        for (int i = 0; i < numOfParticles; i++) {
-            if(Math.random() < prob) {
-                addIota(null);
-            }
+    @FunctionalInterface
+    public interface Emission {
+        void emit();
+    }
+
+    public static void emmitIota(double dt) {
+        double count = injectRate * dt;
+        for (int i = 0; i < count; i++) {
+            addIota(null);
         }
     }
 
-    public static void escapeIota() {
+    public static void injectIota(double dt) {
+        double count = injectRate * dt;
+        for (int i = 0; i < count; i++) {
+            addIota(null);
+        }
+    }
+
+    public static void escapeIota(double dt) {
         for (int i = 0; i < numOfParticles; i++) {
-            if (flag.get(i) > 0) {
+            if (flag.get(i) > 0 && combinators.get(i) != null) {
                 String script = combinators.get(i).script();
                 if (!script.contains("S") && !script.contains("K") && !script.contains("I")) {
-                    if (Math.random() < escapeProb) {
-                        flag.set(i, -1);
+                    if (Math.random() < escapeProb * dt) {
+                        flag.set(i, -1.0);
+                        combinators.set(i, null);
                     }
                 }
             }
         }
-    }
-
-    // Elastic collision: https://en.wikipedia.org/wiki/Elastic_collision
-    public static void elasticCollision() {
-        double imass = mass.get(icollision);
-        double jmass = mass.get(jcollision);
-        Vector3 ipos = Vector3.create(pos.slice(0, icollision));
-        Vector3 jpos = Vector3.create(pos.slice(0, jcollision));
-        Vector3 ivelo = Vector3.create(velo.slice(0, icollision));
-        Vector3 jvelo = Vector3.create(velo.slice(0, jcollision));
-        Vector3 dvelo = Vector3.create(ivelo.subCopy(jvelo));
-        Vector3 dpos = Vector3.create(ipos.subCopy(jpos));
-
-        double iratio = 2 * jmass / (imass + jmass);
-        double jratio = 2 * imass / (imass + jmass);
-        double distsq = dpos.dotProduct(dpos);
-        double c1 = dpos.dotProduct(dvelo);
-
-        ivelo.sub(dpos.scaleCopy(iratio * c1 / distsq));
-        jvelo.sub(dpos.scaleCopy(- jratio * c1 / distsq));
-        velo.slice(0, icollision).set(ivelo);
-        velo.slice(0, jcollision).set(jvelo);
     }
 
     public static void main(String[] args) {
@@ -351,19 +377,15 @@ public class ParticleSystem {
         while(true) {
             refreshTree();
             checkDeltaT();
-
-            t = t + mindt;
-
             freefly(mindt);
 
-            if (t - lastt > 0.1) {
-                injectIota();
-                escapeIota();
-            }
+            t = t + mindt;
+            emmitIota(mindt);
+            injectIota(mindt);
+            escapeIota(mindt);
 
             checkCollision();
-
-            if (mindist < 0.1) {
+            if (mindist < collisionThreshhold) {
                 counter++;
                 collisionMerge();
             }
