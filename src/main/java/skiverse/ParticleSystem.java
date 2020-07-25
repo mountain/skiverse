@@ -12,6 +12,7 @@ import ski.SKI;
 
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
 import static mikera.arrayz.Arrayz.fillRandom;
@@ -22,8 +23,8 @@ public class ParticleSystem {
 
     static double width = 64;
     static int numOfParticles = 8192;
-    static double injectRate = 16.0;
-    static double escapeProb = 0.90;
+    static double injectRate = 128.0;
+    static double escapeProb = 0.80;
 
     static INDArray flag = newArray(numOfParticles);
     static INDArray mass = newArray(numOfParticles);
@@ -75,7 +76,7 @@ public class ParticleSystem {
 
     public static void init() {
         fillRandom(flag, new Date().getTime());
-        flag.multiply(4);
+        flag.multiply(2);
         flag.sub(1);
 
         fillRandom(pos, new Date().getTime());
@@ -83,6 +84,7 @@ public class ParticleSystem {
         pos.multiply(width);
         velo.multiply(2);
         velo.sub(1);
+        velo.scale(0.7);
 
         for (int i = 0; i < numOfParticles; i++) {
             combinators.add(null);
@@ -115,28 +117,34 @@ public class ParticleSystem {
         tree.detectCollisionPairs(collisionPairs);
     }
 
-    public static void addIota() {
+    public static void addIota(Vector3 position) {
         int i = 0;
         for (; i<numOfParticles; i++) {
             if (flag.get(i) < 0) break;
         }
 
         INDArray apos = pos.slice(0, i);
-        INDArray avelo = pos.slice(0, i);
-        fillRandom(apos, new Date().getTime());
+        if (position == null) {
+            fillRandom(apos, new Date().getTime());
+            apos.multiply(width);
+        } else {
+            apos.set(position);
+        }
+
+        Vector3 avelo = Vector3.create(velo.slice(0, i));
         fillRandom(avelo, new Date().getTime());
-        apos.multiply(width);
         avelo.multiply(2);
         avelo.sub(1);
+        double length = Math.sqrt(avelo.dotProduct(avelo));
+        avelo.scale(1.0 / length);
 
         combinators.set(i, SKI.iota());
-        Vector3 ivelo = Vector3.create(velo.slice(0, i));
-        double vsq = ivelo.dotProduct(ivelo);
+        double vsq = avelo.dotProduct(avelo);
         double m = combinators.get(i).mass();
         mass.set(i, m);
         potn.set(i, 0.0);
         knct.set(i, m * vsq / 2);
-        mmnt.slice(0, i).set(ivelo.scaleCopy(m));
+        mmnt.slice(0, i).set(avelo.scaleCopy(m));
 
         flag.set(i, 1.0);
         lastt = t;
@@ -224,18 +232,27 @@ public class ParticleSystem {
         double zknct = zmass * zvsq / 2;
         double zpotn = potn.get(icollision) + potn.get(jcollision) + knct.get(icollision) + knct.get(jcollision) - zknct;
 
+        Vector3 ipos = Vector3.create(pos.slice(0, icollision));
+        Vector3 jpos = Vector3.create(pos.slice(0, jcollision));
+        Vector3 zpos = ipos.addCopy(jpos);
+        zpos.scale(0.5);
+
         double mloss = lmass + rmass - zmass;
         for(int k = 0; k < mloss; k++) {
-            addIota();
+            addIota(zpos);
         }
-        for (int k = 0; k < zpotn; k++) {
-            addIota();
+
+        int k = 0;
+        for (; k < zpotn; k++) {
+            addIota(zpos);
         }
+        zpotn = zpotn - k;
 
         combinators.set(i, result);
         mass.set(i, zmass);
         knct.set(i, zknct);
-        potn.set(i, 0.0);
+        potn.set(i, zpotn);
+        pos.slice(0, i).set(zpos);
         velo.slice(0, i).set(zvelo);
         mmnt.slice(0, i).set(zvelo.scaleCopy(zmass));
 
@@ -244,6 +261,7 @@ public class ParticleSystem {
         System.out.println("time %f".formatted(t));
         System.out.println("collision %d: %d, %d".formatted(counter, icollision, jcollision));
         System.out.println("script %d: %s, %s -> %s".formatted(counter, left.script(), right.script(), result.script()));
+        System.out.println("------------------------------------------------------------------");
         System.out.println("mass %d: %f, %f -> %f".formatted(counter, left.mass(), right.mass(), result.mass()));
         System.out.println("kinect %d: %f, %f -> %f".formatted(counter, lknct, rknct, zknct));
         System.out.println("potential %d: %f, %f -> %f".formatted(counter, lpotn, rpotn, zpotn));
@@ -254,10 +272,19 @@ public class ParticleSystem {
         System.out.println("total potential %d: %f".formatted(counter, potn.elementSum()));
         System.out.println("------------------------------------------------------------------");
         System.out.println("time %f".formatted(t));
+        System.out.println("particles %d".formatted(countMap.values().stream().reduce(0, new BinaryOperator() {
+            @Override
+            public Object apply(Object o, Object o2) {
+                return ((Integer)o).intValue() + ((Integer)o2).intValue() ;
+            }
+        }).intValue()));
+        System.out.println("diversity %d".formatted(countMap.size()));
+        System.out.println("------------------------------------------------------------------");
+        System.out.println("time %f".formatted(t));
         countMap.clear();
-        for (int k = 0; k < numOfParticles; k++) {
-            if (flag.get(k) > 0) {
-                String key = combinators.get(k).script();
+        for (int l = 0; l < numOfParticles; l++) {
+            if (flag.get(l) > 0) {
+                String key = combinators.get(l).script();
                 if (!countMap.containsKey(key)) {
                     countMap.put(key, 1);
                 } else {
@@ -278,7 +305,7 @@ public class ParticleSystem {
         double prob = injectRate / numOfParticles;
         for (int i = 0; i < numOfParticles; i++) {
             if(Math.random() < prob) {
-                addIota();
+                addIota(null);
             }
         }
     }
