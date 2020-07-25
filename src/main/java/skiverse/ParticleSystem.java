@@ -23,7 +23,6 @@ public class ParticleSystem {
 
     static double width = 64;
     static int numOfParticles = 8192;
-    static double emmitRate = 20.0; // platonic dodecahedron: the edge length is greater than the radius
     static double injectRate = 128.0;
     static double escapeProb = 0.80;
     static double collisionThreshhold = 0.1;
@@ -40,7 +39,7 @@ public class ParticleSystem {
     static AABBTree<Entity> tree = new AABBTree<Entity>();
     static List<CollisionPair<Entity>> collisionPairs = new ArrayList<CollisionPair<Entity>>(numOfParticles / 10);
 
-    static Map<Integer, Deque<Emission>> emissionQueues = new HashMap<>();
+    static Map<Integer, Emission> emissionQueues = new HashMap<>();
 
     static List<SKI.Combinator> combinators = new ArrayList<SKI.Combinator>(numOfParticles);
     static Map<String, Integer> countMap = new HashMap<String, Integer>();
@@ -49,7 +48,7 @@ public class ParticleSystem {
     static double lastt = 0;
     static int counter = 0;
 
-    static double mindt = width;
+    static double mindt = 1.0;
     static double mindist = Double.MAX_VALUE;
     static int icollision = -1;
     static int jcollision = -1;
@@ -172,7 +171,42 @@ public class ParticleSystem {
         }
 
         flag.set(i, 0.0);
-        lastt = t;
+    }
+
+    public static void addIota(int origin, Vector3 position, Vector3 velocity) {
+        if (flag.get(origin) < 0) return;
+        SKI.Combinator o = combinators.get(origin);
+        if (o == null) return;
+        double mo = o.mass();
+
+        int i = 0;
+        for (; i < numOfParticles; i++) {
+            if (flag.get(i) < 0) break;
+        }
+        if (i >= numOfParticles) {
+            return;
+        }
+
+        INDArray apos = pos.slice(0, i);
+        apos.set(position);
+
+        combinators.set(i, SKI.iota());
+        double vsq = velocity.dotProduct(velocity);
+        double m = combinators.get(i).mass();
+        AVector p = velocity.scaleCopy(m);
+
+        mass.set(i, m);
+        knct.set(i, m * vsq / 2);
+        mmnt.slice(0, i).set(p);
+        potn.set(i, 0.0);
+
+        mmnt.slice(0, origin).sub(p);
+        velo.slice(0, origin).set(Vector3.create(mmnt.slice(0, origin)).scaleCopy(1.0 / m));
+        Vector3 v = Vector3.create(velo.slice(0, origin));
+        knct.set(origin, v.dotProduct(v) / 2.0 * mo);
+        potn.set(origin, potn.get(origin) - m * vsq / 2);
+
+        flag.set(i, 0.0);
     }
 
     public static void freefly(double mdt) {
@@ -192,7 +226,7 @@ public class ParticleSystem {
     }
 
     public static void checkDeltaT() {
-        mindt = 0.2;
+        mindt = 1.0;
         for(CollisionPair p: collisionPairs) {
             int i = ((Entity)p.getObjectA()).idx;
             int j = ((Entity)p.getObjectB()).idx;
@@ -278,11 +312,7 @@ public class ParticleSystem {
 
         zpotn = lmass + rmass - zmass + zpotn;
         if (zpotn > 0) {
-            Deque<Emission> queue = new ArrayDeque();
-            emissionQueues.put(i, queue);
-            queue.add(() -> {
-
-            });
+            emissionQueues.put(i, new Emission(i));
         }
 
         combinators.set(i, result);
@@ -338,15 +368,41 @@ public class ParticleSystem {
         System.out.println("------------------------------------------------------------------");
     }
 
-    @FunctionalInterface
-    public interface Emission {
-        void emit();
+    public static class Emission {
+        private int index;
+        public Emission(int index) {
+            this.index = index;
+        }
+        void emit(double dt) {
+            if (flag.get(index) <= 0) {
+                emissionQueues.remove(index);
+            } else {
+                double potential = potn.get(index);
+                if (potential <= 0) {
+                    emissionQueues.remove(index);
+                } else {
+                    Vector3 v = Vector3.create(velo.slice(0, this.index));
+                    double speed = Math.sqrt(v.dotProduct(v));
+
+                    Vector3 emission = new Vector3();
+                    fillRandom(emission, new Date().getTime());
+                    emission.multiply(2);
+                    emission.sub(1);
+                    double length = Math.sqrt(emission.dotProduct(emission));
+                    emission.scale(1.0 / length);
+                    emission.crossProduct(v.scaleCopy(1.0 / speed));
+                    emission.add(v);
+
+                    Vector3 p = Vector3.create(pos.slice(0, this.index));
+                    addIota(this.index, p, emission);
+                }
+            }
+        }
     }
 
     public static void emmitIota(double dt) {
-        double count = injectRate * dt;
-        for (int i = 0; i < count; i++) {
-            addIota(null);
+        for (int key: new ArrayList<Integer>(emissionQueues.keySet())) {
+            emissionQueues.get(key).emit(dt);
         }
     }
 
@@ -365,6 +421,12 @@ public class ParticleSystem {
                     if (Math.random() < escapeProb * dt) {
                         flag.set(i, -1.0);
                         combinators.set(i, null);
+                        mass.set(i, 0.0);
+                        knct.set(i, 0.0);
+                        potn.set(i, 0.0);
+                        pos.slice(0, i).scale(0.0);
+                        velo.slice(0, i).scale(0.0);
+                        mmnt.slice(0, i).scale(0.0);
                     }
                 }
             }
@@ -377,12 +439,12 @@ public class ParticleSystem {
         while(true) {
             refreshTree();
             checkDeltaT();
-            freefly(mindt);
 
-            t = t + mindt;
             emmitIota(mindt);
             injectIota(mindt);
             escapeIota(mindt);
+            freefly(mindt);
+            t = t + mindt;
 
             checkCollision();
             if (mindist < collisionThreshhold) {
