@@ -21,18 +21,32 @@ public interface SKI {
         double mass();
         String script();
         Context tokenize(int maxdepth);
+        void supply(Potential potential);
         Combinator eval();
+    }
+
+    class Potential {
+        double val = 0.0;
+        public Potential(double p) {
+            this.val = p;
+        }
+
+        public void use(double amount) {
+            this.val = this.val - amount;
+        }
     }
 
     class Context extends HashMap<String, Combinator> {
         int counter;
         int maxdepth;
         StringBuffer snippet;
+        Potential potential;
 
-        Context(int maxdepth) {
+        Context(int maxdepth, Potential potential) {
             this.counter = 1;
             this.snippet = new StringBuffer();
             this.maxdepth = maxdepth;
+            this.potential = potential;
         }
 
         public String script() {
@@ -74,11 +88,20 @@ public interface SKI {
             this.counter++;
         }
 
+        @Override
+        public Combinator get(Object key) {
+            Combinator val = super.get(key);
+            if (val instanceof CompositiveCombinator comp) {
+                comp.potential = this.potential;
+            }
+            return val;
+        }
     }
 
     class CompositiveCombinator implements Combinator {
         public final Combinator left;
         public final Combinator right;
+        public Potential potential;
 
         CompositiveCombinator(Combinator left, Combinator right) {
             this.left = left;
@@ -97,11 +120,18 @@ public interface SKI {
 
         @Override
         public Context tokenize(int maxdepth) {
-            Context ctx = new Context(maxdepth);
+            Context ctx = new Context(maxdepth, this.potential);
             ctx.visitLeft(left, 1);
             ctx.visitRoot();
             ctx.visitRight(right);
             return ctx;
+        }
+
+        @Override
+        public void supply(Potential potential) {
+            this.potential = potential;
+            this.left.supply(potential);
+            this.right.supply(potential);
         }
 
         protected Combinator check(Combinator val) {
@@ -111,13 +141,26 @@ public interface SKI {
             double mb = val.mass();
 
             //return val;
-            if (ma > mb) {
-                return val;
-            } else if (ma == mb) {
-                if (!sa.equals(sb)) {
+
+            if (this.potential != null) {
+                if (ma + this.potential.val > mb) {
+                    this.potential.use(mb - ma);
                     return val;
+                } else if (ma + this.potential.val == mb) {
+                    if (!sa.equals(sb)) {
+                        return val;
+                    }
+                }
+            } else {
+                if (ma > mb) {
+                    return val;
+                } else if (ma  == mb) {
+                    if (!sa.equals(sb)) {
+                        return val;
+                    }
                 }
             }
+
             return this;
         }
 
@@ -232,6 +275,10 @@ public interface SKI {
             }
 
             @Override
+            public void supply(Potential potential) {
+            }
+
+            @Override
             public Combinator eval() {
                 return this;
             }
@@ -255,6 +302,10 @@ public interface SKI {
             @Override
             public Context tokenize(int maxdepth) {
                 return null;
+            }
+
+            @Override
+            public void supply(Potential potential) {
             }
 
             @Override
@@ -284,6 +335,10 @@ public interface SKI {
             }
 
             @Override
+            public void supply(Potential potential) {
+            }
+
+            @Override
             public Combinator eval() {
                 return this;
             }
@@ -310,6 +365,10 @@ public interface SKI {
             }
 
             @Override
+            public void supply(Potential potential) {
+            }
+
+            @Override
             public Combinator eval() {
                 return this;
             }
@@ -333,6 +392,10 @@ public interface SKI {
             @Override
             public Context tokenize(int maxdepth) {
                 return null;
+            }
+
+            @Override
+            public void supply(Potential potential) {
             }
 
             @Override

@@ -155,5 +155,13 @@ class SKITest {
         assertEquals("(((S, I), I), ((S, (K, I)), ((S, I), I)))", selfappl.eval().script());
     }
 
+    @Test
+    void testChain() {
+        Combinator chain = cons(cons(iota(), cons(cons(cons(iota(), cons(cons(S(), iota()), iota())), iota()), iota())), var("x"));
+        chain.supply(new Potential(256.0));
+        assertEquals("((ι, (((ι, ((S, ι), ι)), ι), ι)), x)", chain.script());
+        assertEquals("((((((ι, ((S, ι), ι)), ι), ι), S), K), x)", chain.eval().script());
+    }
+
 }
 

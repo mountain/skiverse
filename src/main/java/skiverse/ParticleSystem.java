@@ -45,7 +45,6 @@ public class ParticleSystem {
     static Map<String, Integer> countMap = new HashMap<String, Integer>();
 
     static double t = 0;
-    static double lastt = 0;
     static int counter = 0;
 
     static double mindt = 1.0;
@@ -226,7 +225,7 @@ public class ParticleSystem {
     }
 
     public static void checkDeltaT() {
-        mindt = 1.0;
+        mindt = 100.0;
         for(CollisionPair p: collisionPairs) {
             int i = ((Entity)p.getObjectA()).idx;
             int j = ((Entity)p.getObjectB()).idx;
@@ -288,15 +287,17 @@ public class ParticleSystem {
             return;
         }
 
-        SKI.Combinator result = SKI.cons(left, right).eval();
-        combinators.set(i, result);
-
         double lmass = mass.get(icollision);
         double rmass = mass.get(jcollision);
         double lknct = knct.get(icollision);
         double rknct = knct.get(jcollision);
         double lpotn = potn.get(icollision);
         double rpotn = potn.get(jcollision);
+
+        SKI.Combinator formula = SKI.cons(left, right);
+        formula.supply(new SKI.Potential(lpotn + rpotn));
+        SKI.Combinator result = formula.eval();
+        combinators.set(i, result);
 
         double zmass = result.mass();
         Vector3 zmmnt = Vector3.create(mmnt.slice(0, icollision).addCopy(mmnt.slice(0, jcollision)));
@@ -391,9 +392,11 @@ public class ParticleSystem {
                     double length = Math.sqrt(emission.dotProduct(emission));
                     emission.scale(1.0 / length);
                     emission.crossProduct(v.scaleCopy(1.0 / speed));
+                    Vector3 direction = emission.copy();
                     emission.add(v);
 
                     Vector3 p = Vector3.create(pos.slice(0, this.index));
+                    p = p.addCopy(direction.scaleCopy(collisionThreshhold));
                     addIota(this.index, p, emission);
                 }
             }
@@ -401,8 +404,10 @@ public class ParticleSystem {
     }
 
     public static void emmitIota(double dt) {
-        for (int key: new ArrayList<Integer>(emissionQueues.keySet())) {
-            emissionQueues.get(key).emit(dt);
+        for (int i = 0; i < 6 * dt; i++) {
+            for (int key : new ArrayList<Integer>(emissionQueues.keySet())) {
+                emissionQueues.get(key).emit(dt);
+            }
         }
     }
 
