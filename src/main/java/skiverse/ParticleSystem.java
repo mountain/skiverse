@@ -133,7 +133,7 @@ public class ParticleSystem {
         avergespeed = Math.sqrt(knct.elementSum() / mass.elementSum() * 2);
     }
 
-    public static void addIota(Vector3 position) {
+    public static void addIota() {
         int i = 0;
         for (; i < numOfParticles; i++) {
             if (flag.get(i) < 0) break;
@@ -143,12 +143,8 @@ public class ParticleSystem {
         }
 
         INDArray apos = pos.slice(0, i);
-        if (position == null) {
-            fillRandom(apos, new Date().getTime());
-            apos.multiply(width);
-        } else {
-            apos.set(position);
-        }
+        fillRandom(apos, new Date().getTime());
+        apos.multiply(width);
 
         Vector3 avelo = Vector3.create(velo.slice(0, i));
         fillRandom(avelo, new Date().getTime());
@@ -164,23 +160,12 @@ public class ParticleSystem {
         knct.set(i, m * vsq / 2);
         mmnt.slice(0, i).set(avelo.scaleCopy(m));
 
-        if (position == null) {
-            potn.set(i, 0.0);
-        } else {
-            potn.set(i, -m * vsq / 2);
-        }
+        potn.set(i, 0.0);
 
         flag.set(i, 0.0);
     }
 
-    public static void addIota(int origin, Vector3 position, Vector3 velocity) {
-        if (flag.get(origin) < 0) return;
-        SKI.Combinator o = combinators.get(origin);
-        if (o == null) return;
-        double omass = o.mass();
-        double oknct = knct.get(origin);
-        double opotn = potn.get(origin);
-
+    public static void addIota(Vector3 position) {
         int i = 0;
         for (; i < numOfParticles; i++) {
             if (flag.get(i) < 0) break;
@@ -192,21 +177,63 @@ public class ParticleSystem {
         INDArray apos = pos.slice(0, i);
         apos.set(position);
 
-        combinators.set(i, SKI.iota());
-        double vsq = velocity.dotProduct(velocity);
-        double m = combinators.get(i).mass();
-        AVector p = velocity.scaleCopy(m);
 
+        Vector3 avelo = Vector3.create(velo.slice(0, i));
+        fillRandom(avelo, new Date().getTime());
+        avelo.multiply(2);
+        avelo.sub(1);
+        double length = Math.sqrt(avelo.dotProduct(avelo));
+        avelo.scale(1.0 / length);
+
+        combinators.set(i, SKI.iota());
+        double vsq = avelo.dotProduct(avelo);
+        double m = combinators.get(i).mass();
         mass.set(i, m);
         knct.set(i, m * vsq / 2);
-        mmnt.slice(0, i).set(p);
+        mmnt.slice(0, i).set(avelo.scaleCopy(m));
+
+        potn.set(i, -m * vsq / 2);
+
+        flag.set(i, 0.0);
+    }
+
+    public static void addIota(int origin, Vector3 position, Vector3 velocity) {
+        if (flag.get(origin) < 0) return;
+        int i = 0;
+        for (; i < numOfParticles; i++) {
+            if (flag.get(i) < 0) break;
+        }
+        if (i >= numOfParticles) {
+            return;
+        }
+
+        SKI.Combinator o = combinators.get(origin);
+        if (o == null) return;
+        double omass = o.mass();
+        double oknct = knct.get(origin);
+        double opotn = potn.get(origin);
+
+        INDArray apos = pos.slice(0, i);
+        apos.set(position);
+
+        combinators.set(i, SKI.iota());
+        double vsq = velocity.dotProduct(velocity);
+        double emass = combinators.get(i).mass();
+        AVector emmnt = velocity.scaleCopy(emass);
+
+        mass.set(i, emass);
+        knct.set(i, emass * vsq / 2);
+        mmnt.slice(0, i).set(emmnt);
         potn.set(i, 0.0);
 
-        mmnt.slice(0, origin).sub(p);
-        velo.slice(0, origin).set(Vector3.create(mmnt.slice(0, origin)).scaleCopy(1.0 / m));
-        Vector3 v = Vector3.create(velo.slice(0, origin));
-        knct.set(origin, v.dotProduct(v) / 2.0 * omass);
-        potn.set(origin, potn.get(origin) - m * vsq / 2);
+        mmnt.slice(0, origin).sub(emmnt);
+        AVector avelo = Vector3.create(mmnt.slice(0, origin)).scaleCopy(1.0 / omass);
+        double aknct = avelo.dotProduct(avelo) / 2.0 * omass;
+        double apotn = potn.get(origin) - emass * vsq / 2;
+
+        velo.slice(0, origin).set(avelo);
+        knct.set(origin, aknct);
+        potn.set(origin, apotn);
 
         flag.set(i, 0.0);
 
@@ -215,7 +242,7 @@ public class ParticleSystem {
         System.out.println("time %f".formatted(t));
         System.out.println("emit: %d -> %d, %d".formatted(origin, origin, i));
         System.out.println("cmbn: %s -> %s, %s".formatted(o.script(), o.script(), combinators.get(i).script()));
-        System.out.println("mass: %f -> %f, %f".formatted(mass.get(origin), mass.get(origin), m));
+        System.out.println("mass: %f -> %f, %f".formatted(mass.get(origin), mass.get(origin), emass));
         System.out.println("knct: %f -> %f, %f".formatted(oknct, knct.get(origin), knct.get(i)));
         System.out.println("potn: %f -> %f, %f".formatted(opotn, potn.get(origin), potn.get(i)));
         System.out.println("------------------------------------------------------------------");
@@ -383,7 +410,7 @@ public class ParticleSystem {
         for(Entry<String, Integer> entry: sortedMap.entrySet()) {
             System.out.println(String.format("%04d: %s", entry.getValue(), entry.getKey()));
         }
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("==================================================================");
     }
 
     public static class Emission {
@@ -399,22 +426,24 @@ public class ParticleSystem {
                 if (potential <= 0) {
                     emissionQueues.remove(index);
                 } else {
-                    Vector3 v = Vector3.create(velo.slice(0, this.index));
-                    double speed = Math.sqrt(v.dotProduct(v));
+                    Vector3 ovelo = Vector3.create(velo.slice(0, this.index));
+                    double ospd = Math.sqrt(ovelo.dotProduct(ovelo));
 
-                    Vector3 emission = new Vector3();
-                    fillRandom(emission, new Date().getTime());
-                    emission.multiply(2);
-                    emission.sub(1);
-                    double length = Math.sqrt(emission.dotProduct(emission));
-                    emission.scale(1.0 / length);
-                    emission.crossProduct(v.scaleCopy(1.0 / speed));
-                    Vector3 direction = emission.copy();
-                    emission.add(v);
+                    Vector3 evelo = new Vector3();
+                    fillRandom(evelo, new Date().getTime());
+                    evelo.multiply(2);
+                    evelo.sub(1);
+                    double length = Math.sqrt(evelo.dotProduct(evelo));
+                    evelo.scale(1.0 / length);
 
-                    Vector3 p = Vector3.create(pos.slice(0, this.index));
-                    p = p.addCopy(direction.scaleCopy(collisionThreshhold));
-                    addIota(this.index, p, emission);
+                    evelo.crossProduct(ovelo.scaleCopy(1.0 / ospd));
+                    evelo.add(ovelo);
+                    length = Math.sqrt(evelo.dotProduct(evelo));
+
+                    Vector3 opos = Vector3.create(pos.slice(0, this.index));
+                    AVector edel = evelo.scaleCopy(collisionThreshhold * 1.1 / length);
+                    Vector3 epos = Vector3.create(opos.addCopy(edel));
+                    addIota(this.index, epos, evelo);
                 }
             }
         }
@@ -431,7 +460,7 @@ public class ParticleSystem {
     public static void injectIota(double dt) {
         double count = injectRate * dt;
         for (int i = 0; i < count; i++) {
-            addIota(null);
+            addIota();
         }
     }
 
