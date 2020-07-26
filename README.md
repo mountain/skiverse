@@ -15,7 +15,7 @@ chemical reactions to program dynamics.
 
 We choose a modified version of SKI as the basis of the program world for several reasons.
 * SKI is Turing complete.
-* Self-replicating program is quite simple is SKI.
+* Self-replicating program is quite simple in SKI.
 * The construction of SKI program is easy which makes the marriage of ideal gas simpler.
 
 ### physical rules
