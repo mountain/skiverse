@@ -1,4 +1,4 @@
-# skiverse: A SKI universe
+# Skiverse: A SKI universe
 
 How life is origin? This is one of the biggest questions for science, but is very hard to reproduce and verify.
 One the other hand, in computer science, [Von Neumann universal constructor](https://en.wikipedia.org/wiki/Von_Neumann_universal_constructor),
