@@ -23,8 +23,9 @@ public class ParticleSystem {
 
     static double width = 64;
     static int numOfParticles = 8192;
+    static double emitRate = 6.0;
     static double injectRate = 128.0;
-    static double escapeProb = 0.80;
+    static double escapeProb = 0.5;
     static double collisionThreshhold = 0.1;
     static double avergespeed = 0.0;
 
@@ -176,7 +177,9 @@ public class ParticleSystem {
         if (flag.get(origin) < 0) return;
         SKI.Combinator o = combinators.get(origin);
         if (o == null) return;
-        double mo = o.mass();
+        double omass = o.mass();
+        double oknct = knct.get(origin);
+        double opotn = potn.get(origin);
 
         int i = 0;
         for (; i < numOfParticles; i++) {
@@ -202,10 +205,20 @@ public class ParticleSystem {
         mmnt.slice(0, origin).sub(p);
         velo.slice(0, origin).set(Vector3.create(mmnt.slice(0, origin)).scaleCopy(1.0 / m));
         Vector3 v = Vector3.create(velo.slice(0, origin));
-        knct.set(origin, v.dotProduct(v) / 2.0 * mo);
+        knct.set(origin, v.dotProduct(v) / 2.0 * omass);
         potn.set(origin, potn.get(origin) - m * vsq / 2);
 
         flag.set(i, 0.0);
+
+        System.out.println("------------------------------------------------------------------");
+        System.out.println("Emission");
+        System.out.println("time %f".formatted(t));
+        System.out.println("emit: %d -> %d, %d".formatted(origin, origin, i));
+        System.out.println("cmbn: %s -> %s, %s".formatted(o.script(), o.script(), combinators.get(i).script()));
+        System.out.println("mass: %f -> %f, %f".formatted(mass.get(origin), mass.get(origin), m));
+        System.out.println("knct: %f -> %f, %f".formatted(oknct, knct.get(origin), knct.get(i)));
+        System.out.println("potn: %f -> %f, %f".formatted(opotn, potn.get(origin), potn.get(i)));
+        System.out.println("------------------------------------------------------------------");
     }
 
     public static void freefly(double mdt) {
@@ -225,7 +238,7 @@ public class ParticleSystem {
     }
 
     public static void checkDeltaT() {
-        mindt = 100.0;
+        mindt = 1.0 / emitRate;
         for(CollisionPair p: collisionPairs) {
             int i = ((Entity)p.getObjectA()).idx;
             int j = ((Entity)p.getObjectB()).idx;
@@ -326,6 +339,8 @@ public class ParticleSystem {
 
         flag.set(i, 1.0);
 
+        System.out.println("==================================================================");
+        System.out.println("Collision");
         System.out.println("time %f".formatted(t));
         System.out.println("collision %d: %d, %d".formatted(counter, icollision, jcollision));
         System.out.println("script %d: %s, %s -> %s".formatted(counter, left.script(), right.script(), result.script()));
@@ -333,7 +348,8 @@ public class ParticleSystem {
         System.out.println("mass %d: %f, %f -> %f".formatted(counter, left.mass(), right.mass(), result.mass()));
         System.out.println("kinect %d: %f, %f -> %f".formatted(counter, lknct, rknct, zknct));
         System.out.println("potential %d: %f, %f -> %f".formatted(counter, lpotn, rpotn, zpotn));
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("==================================================================");
+        System.out.println("Statistic");
         System.out.println("time %f".formatted(t));
         System.out.println("total mass %d: %f".formatted(counter, mass.elementSum()));
         System.out.println("total kinect %d: %f".formatted(counter, knct.elementSum()));
@@ -347,7 +363,8 @@ public class ParticleSystem {
             }
         }).intValue()));
         System.out.println("diversity %d".formatted(countMap.size()));
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("==================================================================");
+        System.out.println("List");
         System.out.println("time %f".formatted(t));
         countMap.clear();
         for (int l = 0; l < numOfParticles; l++) {
@@ -404,7 +421,7 @@ public class ParticleSystem {
     }
 
     public static void emmitIota(double dt) {
-        for (int i = 0; i < 6 * dt; i++) {
+        for (int i = 0; i < emitRate * dt; i++) {
             for (int key : new ArrayList<Integer>(emissionQueues.keySet())) {
                 emissionQueues.get(key).emit(dt);
             }
