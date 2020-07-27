@@ -3,7 +3,7 @@
 How life is origin? This is one of the biggest questions for science, but is very hard to reproduce and verify.
 On the other hand, in computer science, [Von Neumann universal constructor](https://en.wikipedia.org/wiki/Von_Neumann_universal_constructor),
 as a self-replicating construction, is not very complex, comparing thier biological counterpart.
-This lead us to we investigate the idea of ideal gas for programs.
+This lead us to we investigate the idea of ideal gas of programs.
 
 Thousands of programs flying inside a box; when they collide, a new program is generated. By a computer science perspective,
 we use gas dynamics and generation rules to replace Chaitin's random sample in AIT; by a biology perspective, we replace
