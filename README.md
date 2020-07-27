@@ -49,7 +49,7 @@ WIP
 
 ## Acknowledgment
 
-Thanks to Weiyi Qiu and Dong Wang for their discussions and encouragings.
+Thanks to Weiyi Qiu and Dong Wang for their discussions and encourages.
 
 Thanks to Patryk Nusbaum for his unlicensed project [dynamicaabbtree](https://github.com/pateman/dynamicaabbtree)
 
