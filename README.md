@@ -18,17 +18,18 @@ We choose a modified version of SKI as the basis of the program world for severa
 * Self-replicating program is quite simple in SKI.
 * The construction of SKI program is easy which makes the marriage of ideal gas simpler.
 
-The modified part of SKI is to introduce potential into the system to avoid an execution of infinite recursion.
-* when a SKI evaluation is not lead to mass loss, the original SKI evaluation is hold.
-* when a SKI evaluation is lead to mass loss, especially with relation to the evaluation of combinator S,
- we must cost amount of energy(potential) to conduct.
+The modified part of SKI is to introduce potential into the system to avoid executions of infinite recursion.
+* when a SKI evaluation is not lead to mass/energy loss, the original SKI evaluation is hold.
+* when a SKI evaluation is lead to mass/energy loss, especially with occurrence of the evaluation of combinator S,
+ we must cost an amount of energy(potential) to conduct the evaluation.
 
 ### physical rules
 
 Then we introduce the attribtes of mass, position, velocity, kinect, potential and momentum for each program and
-related conservation laws, and applying the conservation laws on two process:
-* collision: keep momentum conserved, convert some part of kinect and mass into potential
-* emission: convert potential into mass by exchange ratio of 1.
+related conservation laws, and apply the conservation laws on three process:
+* collision: keep momentum conserved, convert some part of kinect into potential
+* reaction: it is a SKI expression evaluation, accompanying mass generation/conversion from/to energy
+* emission: convert energy(potential) into mass by exchange ratio of 1, and keep momentum conserved.
  
 We use combinator S, K, I as materials, and combinator ι as purely energy just like photons.
  
@@ -38,8 +39,8 @@ Just like earth, we receive short-wave radiation from sun to feed energy into th
  and emit long-wave radiation into the universe.
 
 We introduce two world settings to make the system dissipative:
-* feeding mechanism: feed combinator ι into the system with a constant rate
-* escaping mechanism: combinator ι can escape from the system randomly
+* ι-feeding: feed combinator ι into the system with a constant rate
+* ι-escaping: combinator ι can escape from the system randomly
 
 
 ## Conclusions
