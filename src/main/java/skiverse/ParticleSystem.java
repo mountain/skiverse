@@ -1,8 +1,8 @@
 package skiverse;
 
-import mikera.arrayz.INDArray;
-import mikera.vectorz.AVector;
-import mikera.vectorz.Vector3;
+import narr.Array;
+import narr.NA;
+import narr.random.Generators;
 import org.joml.AABBf;
 import pl.pateman.dynamicaabbtree.AABBTree;
 import pl.pateman.dynamicaabbtree.Boundable;
@@ -15,45 +15,77 @@ import java.util.Map.Entry;
 import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
-import static mikera.arrayz.Arrayz.fillRandom;
-import static mikera.arrayz.Arrayz.newArray;
-
 
 public class ParticleSystem {
 
-    static double width = 64;
-    static int numOfParticles = 8192;
-    static double emitRate = 6.0;
-    static double injectRate = 128.0;
-    static double escapeProb = 0.5;
-    static double collisionThreshhold = 0.1;
-    static double avergespeed = 0.0;
+    public static double width = 64;
+    public static int numOfParticles = 8192;
+    public static double emitRate = 6.0;
+    public static double injectRate = 0.0;
+    public static double escapeProb = 0.9;
+    public static double collisionThreshhold = 0.1;
 
-    static INDArray flag = newArray(numOfParticles);
-    static INDArray mass = newArray(numOfParticles);
-    static INDArray pos = newArray(numOfParticles, 3);
-    static INDArray velo = newArray(numOfParticles, 3);
-    static INDArray potn = newArray(numOfParticles);
-    static INDArray knct = newArray(numOfParticles);
-    static INDArray mmnt = newArray(numOfParticles, 3);
+    protected Array flag = NA.zeros(numOfParticles);
+    protected Array mass = NA.zeros(numOfParticles);
+    protected Array posn = NA.zeros(numOfParticles, 3);
+    protected Array velo = NA.zeros(numOfParticles, 3);
+    protected Array mmnt = NA.zeros(numOfParticles, 3);
+    protected Array sppd = NA.zeros(numOfParticles);
+    protected Array potn = NA.zeros(numOfParticles);
+    protected Array knct = NA.zeros(numOfParticles);
 
-    static AABBTree<Entity> tree = new AABBTree<Entity>();
-    static List<CollisionPair<Entity>> collisionPairs = new ArrayList<CollisionPair<Entity>>(numOfParticles / 10);
+    protected double avergespeed = 0.0;
 
-    static Map<Integer, Emission> emissionQueues = new HashMap<>();
+    protected AABBTree<Entity> tree = new AABBTree<Entity>();
+    protected List<CollisionPair<Entity>> collisionPairs = new ArrayList<CollisionPair<Entity>>(numOfParticles / 10);
 
-    static List<SKI.Combinator> combinators = new ArrayList<SKI.Combinator>(numOfParticles);
-    static Map<String, Integer> countMap = new HashMap<String, Integer>();
+    protected Map<Integer, Emission> emissionQueues = new HashMap<>();
 
-    static double t = 0;
-    static int counter = 0;
+    protected List<SKI.Combinator> combinators = new ArrayList<SKI.Combinator>(numOfParticles);
+    protected Map<String, Integer> countMap = new HashMap<String, Integer>();
 
-    static double mindt = 1.0;
-    static double mindist = Double.MAX_VALUE;
-    static int icollision = -1;
-    static int jcollision = -1;
+    protected double t = 0;
+    protected int counter = 0;
 
-    static class Entity implements Identifiable, Boundable {
+    protected double mindt = 1.0;
+    protected double mindist = Double.MAX_VALUE;
+    protected int icollision = -1;
+    protected int jcollision = -1;
+
+    public ParticleSystem() {
+        flag.fill(Generators.uniform_n1p1);
+        posn.fill(Generators.uniform_01).scale(width);
+        velo.fill(Generators.uniform_n1p1).scale(0.7);
+        velo.along(0, (i, v) -> sppd.set(i, v.norm()));
+
+        for (int i = 0; i < numOfParticles; i++) {
+            combinators.add(null);
+        }
+
+        for (int i = 0; i < numOfParticles; i++) {
+            if (flag.element(i) > 0) {
+                SKI.Combinator cmbn = null;
+                switch (i % 3) {
+                    case 0: cmbn = SKI.I(); break;
+                    case 1: cmbn = SKI.K(); break;
+                    case 2: cmbn = SKI.S(); break;
+                }
+                combinators.set(i, cmbn);
+                double m = cmbn.mass();
+                double v = sppd.element(i);
+
+                mass.set(i, m);
+                knct.set(i, m * v * v / 2.0);
+
+                for (int j = 0; j < 3; j++) {
+                    mmnt.set(i, j, velo.element(i, j) * m);
+                }
+            }
+        }
+        avergespeed = sppd.mean();
+    }
+
+    class Entity implements Identifiable, Boundable {
         public int idx;
 
         public Entity(int idx) {
@@ -66,11 +98,15 @@ public class ParticleSystem {
                 dest = new AABBf();
             }
 
-            double thresh = collisionThreshhold / avergespeed;
-            INDArray p = pos.slice(0, this.idx);
-            INDArray v = velo.slice(0, this.idx);
-            dest.setMin((float)p.get(0), (float)p.get(1), (float)p.get(2));
-            dest.setMax((float)(p.get(0) + v.get(0) * thresh), (float)(p.get(1) + v.get(1) * thresh), (float)(p.get(2) + v.get(2) * thresh));
+            float thresh = (float)(collisionThreshhold / avergespeed);
+            float px = (float)posn.element(this.idx, 0);
+            float py = (float)posn.element(this.idx, 1);
+            float pz = (float)posn.element(this.idx, 2);
+            float vx = (float)velo.element(this.idx, 0);
+            float vy = (float)velo.element(this.idx, 1);
+            float vz = (float)velo.element(this.idx, 2);
+            dest.setMin(px, py, pz);
+            dest.setMax(px + vx * thresh, py + vy * thresh, pz + vz * thresh);
             return dest;
         }
 
@@ -80,207 +116,140 @@ public class ParticleSystem {
         }
     }
 
-    public static void init() {
-        fillRandom(flag, new Date().getTime());
-        flag.multiply(2);
-        flag.sub(1);
-
-        fillRandom(pos, new Date().getTime());
-        fillRandom(velo, new Date().getTime());
-        pos.multiply(width);
-        velo.multiply(2);
-        velo.sub(1);
-        velo.scale(0.7);
-
-        for (int i = 0; i < numOfParticles; i++) {
-            combinators.add(null);
+    protected int availableIndex() {
+        int i = 0;
+        for (; i < numOfParticles; i++) {
+            if (flag.element(i) < 0) return i;
         }
-
-        for (int i = 0; i < numOfParticles; i++) {
-            if (flag.get(i) < 0) {
-                mass.set(i, 0.0);
-                potn.set(i, 0.0);
-                knct.set(i, 0.0);
-                mmnt.slice(0, i).scale(0);
-            } else {
-                switch (i % 3) {
-                    case 0: combinators.set(i, SKI.I()); break;
-                    case 1: combinators.set(i, SKI.K()); break;
-                    case 2: combinators.set(i, SKI.S()); break;
-                }
-
-                Vector3 ivelo = Vector3.create(velo.slice(0, i));
-                double vsq = ivelo.dotProduct(ivelo);
-                double m = combinators.get(i).mass();
-                mass.set(i, m);
-                potn.set(i, 0.0);
-                knct.set(i, m * vsq / 2);
-                mmnt.slice(0, i).set(ivelo.scaleCopy(m));
-            }
-        }
+        throw new RuntimeException("no available index exists");
     }
 
-    public static void refreshTree() {
+    public void refresh() {
         tree.clear();
         collisionPairs.clear();
         for(int i = 0; i < numOfParticles; i++) {
-            if(flag.get(i) > 0.0) {
+            if(flag.element(i) >= 0.0) {
                 tree.add(new Entity(i));
             }
         }
         tree.detectCollisionPairs(collisionPairs);
 
-        avergespeed = Math.sqrt(knct.elementSum() / mass.elementSum() * 2);
+        avergespeed = sppd.mean();
     }
 
-    public static void addIota() {
-        int i = 0;
-        for (; i < numOfParticles; i++) {
-            if (flag.get(i) < 0) break;
-        }
-        if (i >= numOfParticles) {
-            return;
-        }
-
-        INDArray apos = pos.slice(0, i);
-        fillRandom(apos, new Date().getTime());
-        apos.multiply(width);
-
-        Vector3 avelo = Vector3.create(velo.slice(0, i));
-        fillRandom(avelo, new Date().getTime());
-        avelo.multiply(2);
-        avelo.sub(1);
-        double length = Math.sqrt(avelo.dotProduct(avelo));
-        avelo.scale(1.0 / length);
-
-        combinators.set(i, SKI.iota());
-        double vsq = avelo.dotProduct(avelo);
-        double m = combinators.get(i).mass();
-        mass.set(i, m);
-        knct.set(i, m * vsq / 2);
-        mmnt.slice(0, i).set(avelo.scaleCopy(m));
-
+    public void clear(int i) {
+        flag.set(i, -1.0);
+        combinators.set(i, null);
+        mass.set(i, 0.0);
+        sppd.set(i, 0.0);
+        knct.set(i, 0.0);
         potn.set(i, 0.0);
-
-        flag.set(i, 0.0);
+        posn.set(i, 0, 0.0);
+        posn.set(i, 1, 0.0);
+        posn.set(i, 2, 0.0);
+        velo.set(i, 0, 0.0);
+        velo.set(i, 1, 0.0);
+        velo.set(i, 2, 0.0);
+        mmnt.set(i, 0, 0.0);
+        mmnt.set(i, 1, 0.0);
+        mmnt.set(i, 2, 0.0);
     }
 
-    public static void addIota(Vector3 position) {
-        int i = 0;
-        for (; i < numOfParticles; i++) {
-            if (flag.get(i) < 0) break;
-        }
-        if (i >= numOfParticles) {
-            return;
-        }
+    public void update(int i, SKI.Combinator cmbn, double m, double px, double py, double pz, double vx, double vy, double vz, double potential) {
+        double f = cmbn.script().equals("ι") ? 0.0 : 1.0;
+        double sq = vx * vx + vy * vy + vz * vz;
+        double s = Math.sqrt(sq);
+        double k = m * sq / 2;
 
-        INDArray apos = pos.slice(0, i);
-        apos.set(position);
-
-
-        Vector3 avelo = Vector3.create(velo.slice(0, i));
-        fillRandom(avelo, new Date().getTime());
-        avelo.multiply(2);
-        avelo.sub(1);
-        double length = Math.sqrt(avelo.dotProduct(avelo));
-        avelo.scale(1.0 / length);
-
-        combinators.set(i, SKI.iota());
-        double vsq = avelo.dotProduct(avelo);
-        double m = combinators.get(i).mass();
+        flag.set(i, f);
+        combinators.set(i, cmbn);
         mass.set(i, m);
-        knct.set(i, m * vsq / 2);
-        mmnt.slice(0, i).set(avelo.scaleCopy(m));
-
-        potn.set(i, -m * vsq / 2);
-
-        flag.set(i, 0.0);
+        sppd.set(i, s);
+        knct.set(i, k);
+        potn.set(i, potential);
+        posn.set(i, 0, px);
+        posn.set(i, 1, py);
+        posn.set(i, 2, pz);
+        velo.set(i, 0, vx);
+        velo.set(i, 1, vy);
+        velo.set(i, 2, vz);
+        mmnt.set(i, 0, m * vx);
+        mmnt.set(i, 1, m * vy);
+        mmnt.set(i, 2, m * vz);
     }
 
-    public static void addIota(int origin, Vector3 position, Vector3 velocity) {
-        if (flag.get(origin) < 0) return;
-        int i = 0;
-        for (; i < numOfParticles; i++) {
-            if (flag.get(i) < 0) break;
-        }
-        if (i >= numOfParticles) {
-            return;
-        }
+    public void update(int e, int o) {
+        double mmntfixx = mmnt.element(e, 0);
+        double mmntfixy = mmnt.element(e, 0);
+        double mmntfixz = mmnt.element(e, 0);
+        double energyfix = knct.element(e) + potn.element(e);
 
-        SKI.Combinator o = combinators.get(origin);
-        if (o == null) return;
-        double omass = o.mass();
-        double oknct = knct.get(origin);
-        double opotn = potn.get(origin);
+        double m = mass.element(o);
+        double mmntx = mmnt.element(o, 0);
+        double mmnty = mmnt.element(o, 1);
+        double mmntz = mmnt.element(o, 2);
+        mmntx = mmntx - mmntfixx;
+        mmnty = mmnty - mmntfixy;
+        mmntz = mmntz - mmntfixz;
+        double velox = mmntx / m;
+        double veloy = mmnty / m;
+        double veloz = mmntx / m;
+        double spdsq = velox * velox + veloy * veloy + veloz * veloz;
+        double speed = Math.sqrt(spdsq);
+        double kinect = m * spdsq / 2.0;
+        double oknct = knct.element(o);
+        double opotn = potn.element(o);
+        double energy = oknct + opotn;
 
-        INDArray apos = pos.slice(0, i);
-        apos.set(position);
-
-        combinators.set(i, SKI.iota());
-        double vsq = velocity.dotProduct(velocity);
-        double emass = combinators.get(i).mass();
-        AVector emmnt = velocity.scaleCopy(emass);
-
-        mass.set(i, emass);
-        knct.set(i, emass * vsq / 2);
-        mmnt.slice(0, i).set(emmnt);
-        potn.set(i, 0.0);
-
-        mmnt.slice(0, origin).sub(emmnt);
-        AVector avelo = Vector3.create(mmnt.slice(0, origin)).scaleCopy(1.0 / omass);
-        double aknct = avelo.dotProduct(avelo) / 2.0 * omass;
-        double apotn = potn.get(origin) - emass * vsq / 2;
-
-        velo.slice(0, origin).set(avelo);
-        knct.set(origin, aknct);
-        potn.set(origin, apotn);
-
-        flag.set(i, 0.0);
+        mmnt.set(o, 0, mmntx);
+        mmnt.set(o, 1, mmnty);
+        mmnt.set(o, 2, mmntz);
+        velo.set(o, 0, velox);
+        velo.set(o, 1, veloy);
+        velo.set(o, 2, veloz);
+        sppd.set(o, speed);
+        knct.set(o, kinect);
+        potn.set(o, energy - energyfix - kinect);
 
         System.out.println("------------------------------------------------------------------");
         System.out.println("Emission");
         System.out.println("time %f".formatted(t));
-        System.out.println("emit: %d -> %d, %d".formatted(origin, origin, i));
-        System.out.println("cmbn: %s -> %s, %s".formatted(o.script(), o.script(), combinators.get(i).script()));
-        System.out.println("mass: %f -> %f, %f".formatted(mass.get(origin), mass.get(origin), emass));
-        System.out.println("knct: %f -> %f, %f".formatted(oknct, knct.get(origin), knct.get(i)));
-        System.out.println("potn: %f -> %f, %f".formatted(opotn, potn.get(origin), potn.get(i)));
+        System.out.println("emit: %d -> %d, %d".formatted(o, o, e));
+        System.out.println("cmbn: %s -> %s, %s".formatted(combinators.get(o).script(), combinators.get(o).script(), combinators.get(e).script()));
+        System.out.println("mass: %f -> %f, %f".formatted(mass.element(o), mass.element(o), combinators.get(e).mass()));
+        System.out.println("knct: %f -> %f, %f".formatted(oknct, knct.element(o), knct.element(e)));
+        System.out.println("potn: %f -> %f, %f".formatted(opotn, potn.element(o), potn.element(e)));
         System.out.println("------------------------------------------------------------------");
     }
 
-    public static void freefly(double mdt) {
+    public void freefly(double mdt) {
         for(int m = 0; m < numOfParticles; m++) {
             for (int n = 0; n < 3; n++) {
-                if (flag.get(m) > 0.0) {
-                    pos.set(m, n, (pos.get(m, n) + velo.get(m, n) * mdt + width) % width);
+                if (flag.element(m) >= 0.0) {
+                    posn.set(m, n, (posn.element(m, n) + velo.element(m, n) * mdt + width) % width);
                 }
-            }
-            if (flag.get(m) < collisionThreshhold) {
-                Vector3 v = Vector3.create(velo.slice(0, m));
-                v.scaleCopy(mindt);
-                double ds = Math.sqrt(v.dotProduct(v));
-                flag.set(m, flag.get(m) + ds);
             }
         }
     }
 
-    public static void checkDeltaT() {
+    public void checkDeltaT() {
         mindt = 1.0 / emitRate;
         for(CollisionPair p: collisionPairs) {
             int i = ((Entity)p.getObjectA()).idx;
             int j = ((Entity)p.getObjectB()).idx;
 
             if (i != j) {
-                Vector3 dpos = Vector3.create(pos.slice(0, i));
-                dpos.sub(Vector3.create(pos.slice(0, j)));
+                double distx = posn.element(i, 0) - posn.element(j, 0);
+                double disty = posn.element(i, 1) - posn.element(j, 1);
+                double distz = posn.element(i, 2) - posn.element(j, 2);
 
-                Vector3 dvelo = Vector3.create(velo.slice(0, i));
-                dvelo.sub(Vector3.create(velo.slice(0, j)));
+                double dvelox = velo.element(i, 0) - velo.element(j, 0);
+                double dveloy = velo.element(i, 1) - velo.element(j, 1);
+                double dveloz = velo.element(i, 2) - velo.element(j, 2);
 
-                double c1 = 2 * dpos.dotProduct(dvelo);
-                double c2 = dvelo.dotProduct(dvelo);
-
-                double dt = c1 / 2 / c2;
+                double c1 = distx * dvelox + disty * dveloy + distz * dveloz;
+                double c2 = dvelox * dvelox + dvelox * dveloy + dvelox * dveloz;
+                double dt = c1 / c2;
                 if (dt > 0 && dt < mindt) {
                     mindt = dt;
                 }
@@ -288,17 +257,18 @@ public class ParticleSystem {
         }
     }
 
-    public static void checkCollision() {
+    public void checkCollision() {
         mindist = width;
         for(CollisionPair p: collisionPairs) {
             int i = ((Entity) p.getObjectA()).idx;
             int j = ((Entity) p.getObjectB()).idx;
 
             if (i != j) {
-                Vector3 dpos = Vector3.create(pos.slice(0, i));
-                dpos.sub(Vector3.create(pos.slice(0, j)));
+                double distx = posn.element(i, 0) - posn.element(j, 0);
+                double disty = posn.element(i, 1) - posn.element(j, 1);
+                double distz = posn.element(i, 2) - posn.element(j, 2);
 
-                double c0 = dpos.dotProduct(dpos);
+                double c0 = distx * distx + disty * disty + distz * distz;
                 if (c0 < mindist * mindist) {
                     mindist = Math.sqrt(c0);
                     icollision = i;
@@ -308,11 +278,11 @@ public class ParticleSystem {
         }
     }
 
-    public static void collisionMerge() {
+    public void collisionMerge() {
         SKI.Combinator left = combinators.get(icollision);
         SKI.Combinator right = combinators.get(jcollision);
 
-        if (left == null || right == null || flag.get(icollision) < 0.0 || flag.get(jcollision) < 0.0) {
+        if (left == null || right == null || flag.element(icollision) < 0.0 || flag.element(jcollision) < 0.0) {
             return;
         }
 
@@ -321,18 +291,22 @@ public class ParticleSystem {
 
         int i = 0;
         for (; i<numOfParticles; i++) {
-            if (flag.get(i) < 0) break;
+            if (flag.element(i) < 0) break;
         }
         if (i >= numOfParticles) {
             return;
         }
 
-        double lmass = mass.get(icollision);
-        double rmass = mass.get(jcollision);
-        double lknct = knct.get(icollision);
-        double rknct = knct.get(jcollision);
-        double lpotn = potn.get(icollision);
-        double rpotn = potn.get(jcollision);
+        double lmass = mass.element(icollision);
+        double rmass = mass.element(jcollision);
+        double lknct = knct.element(icollision);
+        double rknct = knct.element(jcollision);
+        double lpotn = potn.element(icollision);
+        double rpotn = potn.element(jcollision);
+
+        double zposx = (posn.element(icollision, 0) * lmass + posn.element(jcollision, 0) * rmass) / (lmass + rmass);
+        double zposy = (posn.element(icollision, 1) * lmass + posn.element(jcollision, 1) * rmass) / (lmass + rmass);
+        double zposz = (posn.element(icollision, 2) * lmass + posn.element(jcollision, 2) * rmass) / (lmass + rmass);
 
         SKI.Combinator formula = SKI.cons(left, right);
         formula.supply(new SKI.Potential(lpotn + rpotn));
@@ -340,17 +314,15 @@ public class ParticleSystem {
         combinators.set(i, result);
 
         double zmass = result.mass();
-        Vector3 zmmnt = Vector3.create(mmnt.slice(0, icollision).addCopy(mmnt.slice(0, jcollision)));
-        AVector zvelo = zmmnt.scaleCopy(1.0 / zmass);
-        double zvsq = zvelo.dotProduct(zvelo);
-        double zknct = zmass * zvsq / 2;
-        double zpotn = potn.get(icollision) + potn.get(jcollision) + knct.get(icollision) + knct.get(jcollision) - zknct;
-
-        Vector3 ipos = Vector3.create(pos.slice(0, icollision));
-        Vector3 jpos = Vector3.create(pos.slice(0, jcollision));
-        Vector3 zpos = ipos.addCopy(jpos);
-        zpos.scale(0.5);
-
+        double zmmntx = mmnt.element(icollision, 0) + mmnt.element(jcollision, 0);
+        double zmmnty = mmnt.element(icollision, 1) + mmnt.element(jcollision, 1);
+        double zmmntz = mmnt.element(icollision, 2) + mmnt.element(jcollision, 2);
+        double zvelox = zmmntx / zmass;
+        double zveloy = zmmnty / zmass;
+        double zveloz = zmmntz / zmass;
+        double zvelosq = zvelox * zvelox + zveloy * zveloy + zveloz * zveloz;
+        double zknct = zmass * zvelosq / 2;
+        double zpotn = potn.element(icollision) + potn.element(jcollision) + knct.element(icollision) + knct.element(jcollision) - zknct;
         zpotn = lmass + rmass - zmass + zpotn;
         if (zpotn > 0) {
             emissionQueues.put(i, new Emission(i));
@@ -360,9 +332,16 @@ public class ParticleSystem {
         mass.set(i, zmass);
         knct.set(i, zknct);
         potn.set(i, zpotn);
-        pos.slice(0, i).set(zpos);
-        velo.slice(0, i).set(zvelo);
-        mmnt.slice(0, i).set(zvelo.scaleCopy(zmass));
+        posn.set(i, 0, zposx);
+        posn.set(i, 1, zposy);
+        posn.set(i, 2, zposz);
+        velo.set(i, 0, zvelox);
+        velo.set(i, 1, zveloy);
+        velo.set(i, 2, zveloz);
+        mmnt.set(i, 0, zmmntx);
+        mmnt.set(i, 1, zmmnty);
+        mmnt.set(i, 2, zmmntz);
+        sppd.set(i, Math.sqrt(zvelosq));
 
         flag.set(i, 1.0);
 
@@ -378,9 +357,9 @@ public class ParticleSystem {
         System.out.println("==================================================================");
         System.out.println("Statistic");
         System.out.println("time %f".formatted(t));
-        System.out.println("total mass %d: %f".formatted(counter, mass.elementSum()));
-        System.out.println("total kinect %d: %f".formatted(counter, knct.elementSum()));
-        System.out.println("total potential %d: %f".formatted(counter, potn.elementSum()));
+        System.out.println("total mass %d: %f".formatted(counter, mass.sum()));
+        System.out.println("total kinect %d: %f".formatted(counter, knct.sum()));
+        System.out.println("total potential %d: %f".formatted(counter, potn.sum()));
         System.out.println("------------------------------------------------------------------");
         System.out.println("time %f".formatted(t));
         System.out.println("particles %d".formatted(countMap.values().stream().reduce(0, new BinaryOperator() {
@@ -395,7 +374,7 @@ public class ParticleSystem {
         System.out.println("time %f".formatted(t));
         countMap.clear();
         for (int l = 0; l < numOfParticles; l++) {
-            if (flag.get(l) >= 0.0 && combinators.get(l) != null) {
+            if (flag.element(l) >= 0.0 && combinators.get(l) != null) {
                 String key = combinators.get(l).script();
                 if (!countMap.containsKey(key)) {
                     countMap.put(key, 1);
@@ -413,43 +392,58 @@ public class ParticleSystem {
         System.out.println("==================================================================");
     }
 
-    public static class Emission {
+    public class Emission {
         private int index;
         public Emission(int index) {
             this.index = index;
         }
         void emit(double dt) {
-            if (flag.get(index) <= 0) {
+            if (flag.element(index) <= 0) {
                 emissionQueues.remove(index);
             } else {
-                double potential = potn.get(index);
+                double potential = potn.element(index);
                 if (potential <= 0) {
                     emissionQueues.remove(index);
                 } else {
-                    Vector3 ovelo = Vector3.create(velo.slice(0, this.index));
-                    double ospd = Math.sqrt(ovelo.dotProduct(ovelo));
+                    double rx = Generators.uniform_n1p1.generate();
+                    double ry = Generators.uniform_n1p1.generate();
+                    double rz = Generators.uniform_n1p1.generate();
+                    double sqr = rx * rx + ry * ry + rz * rz;
+                    double sr = Math.sqrt(sqr);
+                    rx = rx / sr;
+                    ry = ry / sr;
+                    rz = rz / sr;
 
-                    Vector3 evelo = new Vector3();
-                    fillRandom(evelo, new Date().getTime());
-                    evelo.multiply(2);
-                    evelo.sub(1);
-                    double length = Math.sqrt(evelo.dotProduct(evelo));
-                    evelo.scale(1.0 / length);
+                    double vx = velo.element(this.index, 0);
+                    double vy = velo.element(this.index, 1);
+                    double vz = velo.element(this.index, 2);
+                    double sqv = vx * vx + vy * vy + vz * vz;
+                    double sv = Math.sqrt(sqv);
+                    vx = vx / sv;
+                    vy = vy / sv;
+                    vz = vz / sv;
 
-                    evelo.crossProduct(ovelo.scaleCopy(1.0 / ospd));
-                    evelo.add(ovelo);
-                    length = Math.sqrt(evelo.dotProduct(evelo));
+                    double tx = vy * rz - vz * ry + vx;
+                    double ty = vz * rx - vx * rz + vy;
+                    double tz = vx * ry - vy * rx + vz;
+                    double sqt = tx * tx + ty * ty + tz * tz;
+                    double st = Math.sqrt(sqt);
 
-                    Vector3 opos = Vector3.create(pos.slice(0, this.index));
-                    AVector edel = evelo.scaleCopy(collisionThreshhold * 1.1 / length);
-                    Vector3 epos = Vector3.create(opos.addCopy(edel));
-                    addIota(this.index, epos, evelo);
+                    double threshdt = collisionThreshhold * 1.1 / st;
+                    double px = posn.element(this.index, 0) + tx * threshdt;
+                    double py = posn.element(this.index, 1) + ty * threshdt;
+                    double pz = posn.element(this.index, 2) + tz * threshdt;
+
+                    int e = availableIndex();
+                    SKI.Combinator iota = SKI.iota();
+                    update(e, iota, iota.mass(), px, py, pz, tx, ty, tz, 0);
+                    update(e, this.index);
                 }
             }
         }
     }
 
-    public static void emmitIota(double dt) {
+    public void emmitIota(double dt) {
         for (int i = 0; i < emitRate * dt; i++) {
             for (int key : new ArrayList<Integer>(emissionQueues.keySet())) {
                 emissionQueues.get(key).emit(dt);
@@ -457,53 +451,39 @@ public class ParticleSystem {
         }
     }
 
-    public static void injectIota(double dt) {
+    public void injectIota(double dt) {
         double count = injectRate * dt;
         for (int i = 0; i < count; i++) {
-            addIota();
+            int j = availableIndex();
+            SKI.Combinator iota = SKI.iota();
+
+            double px = Generators.uniform_01.generate() * width;
+            double py = Generators.uniform_01.generate() * width;
+            double pz = Generators.uniform_01.generate() * width;
+            double vx = Generators.uniform_n1p1.generate();
+            double vy = Generators.uniform_n1p1.generate();
+            double vz = Generators.uniform_n1p1.generate();
+            double sq = vx * vx + vy * vy + vz * vz;
+            double s = Math.sqrt(sq);
+            vx = vx / s;
+            vy = vy / s;
+            vz = vz / s;
+
+            update(j, iota, iota.mass(), px, py, pz, vx, vy, vz, 0);
         }
     }
 
-    public static void escapeIota(double dt) {
+    public void escapeIota(double dt) {
         for (int i = 0; i < numOfParticles; i++) {
-            if (flag.get(i) > 0 && combinators.get(i) != null) {
+            if (flag.element(i) > 0 && combinators.get(i) != null) {
                 String script = combinators.get(i).script();
                 if (!script.contains("S") && !script.contains("K") && !script.contains("I")) {
                     if (Math.random() < escapeProb * dt) {
-                        flag.set(i, -1.0);
-                        combinators.set(i, null);
-                        mass.set(i, 0.0);
-                        knct.set(i, 0.0);
-                        potn.set(i, 0.0);
-                        pos.slice(0, i).scale(0.0);
-                        velo.slice(0, i).scale(0.0);
-                        mmnt.slice(0, i).scale(0.0);
+                        clear(i);
                     }
                 }
             }
         }
-    }
-
-    public static void main(String[] args) {
-        init();
-
-        while(true) {
-            refreshTree();
-            checkDeltaT();
-
-            emmitIota(mindt);
-            injectIota(mindt);
-            escapeIota(mindt);
-            freefly(mindt);
-            t = t + mindt;
-
-            checkCollision();
-            if (mindist < collisionThreshhold) {
-                counter++;
-                collisionMerge();
-            }
-        }
-
     }
 
 }
