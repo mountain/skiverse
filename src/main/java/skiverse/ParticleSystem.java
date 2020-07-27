@@ -402,7 +402,7 @@ public class ParticleSystem {
                 emissionQueues.remove(index);
             } else {
                 double potential = potn.element(index);
-                if (potential <= 0) {
+                if (potential < 0.5) {
                     emissionQueues.remove(index);
                 } else {
                     double rx = Generators.uniform_n1p1.generate();
