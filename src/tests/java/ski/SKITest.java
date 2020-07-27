@@ -158,8 +158,10 @@ class SKITest {
     @Test
     void testChain() {
         Combinator chain = cons(cons(iota(), cons(cons(cons(iota(), cons(cons(S(), iota()), iota())), iota()), iota())), var("x"));
-        chain.supply(new Potential(256.0));
         assertEquals("((ι, (((ι, ((S, ι), ι)), ι), ι)), x)", chain.script());
+        chain.supply(new Potential(7.0));
+        assertEquals("((ι, (((ι, ((S, ι), ι)), ι), ι)), x)", chain.eval().script());
+        chain.supply(new Potential(8.0));
         assertEquals("((((((ι, ((S, ι), ι)), ι), ι), S), K), x)", chain.eval().script());
     }
 
