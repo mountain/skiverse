@@ -18,17 +18,17 @@ We choose a modified version of SKI as the basis of the program world for severa
 * Self-replicating program is quite simple in SKI.
 * The construction of SKI program is easy which makes the marriage of ideal gas simpler.
 
+The modified part of SKI is to introduce potential into the system to avoid an execution of infinite recursion.
+* when a SKI evaluation is not lead to mass loss, the original SKI evaluation is hold.
+* when a SKI evaluation is lead to mass loss, especially with relation to the evaluation of combinator S,
+ we must cost amount of energy(potential) to conduct.
+
 ### physical rules
 
 Then we introduce the attribtes of mass, position, velocity, kinect, potential and momentum for each program and
 related conservation laws, and applying the conservation laws on two process:
 * collision: keep momentum conserved, convert some part of kinect and mass into potential
 * emission: convert potential into mass by exchange ratio of 1.
-
-The modified part of SKI is to introduce potential into the system to avoid an execution of infinite recursion.
-* when a SKI evaluation is not lead to mass loss, the original SKI evaluation is hold.
-* when a SKI evaluation is lead to mass loss, especially with relation to the evaluation of combinator S,
- we must cost amount of energy(potential) to conduct.
  
 We use combinator S, K, I as materials, and combinator ι as purely energy just like photons.
  
