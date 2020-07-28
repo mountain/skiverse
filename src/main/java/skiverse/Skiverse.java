@@ -8,6 +8,7 @@ public class Skiverse {
             psys.refresh();
             psys.checkDeltaT();
 
+            psys.splitExec(psys.mindt);
             psys.emmitIota(psys.mindt);
             psys.injectIota(psys.mindt);
             psys.escapeIota(psys.mindt);

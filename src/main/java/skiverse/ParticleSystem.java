@@ -25,6 +25,9 @@ public class ParticleSystem {
     public static double escapeProb = 0.9;
     public static double collisionThreshhold = 0.1;
 
+    protected int population = 0;
+    protected int diversity = 0;
+
     protected Array flag = NA.zeros(numOfParticles);
     protected Array mass = NA.zeros(numOfParticles);
     protected Array posn = NA.zeros(numOfParticles, 3);
@@ -40,6 +43,7 @@ public class ParticleSystem {
     protected List<CollisionPair<Entity>> collisionPairs = new ArrayList<CollisionPair<Entity>>(numOfParticles / 10);
 
     protected Map<Integer, Emission> emissionQueues = new HashMap<>();
+    protected Map<Integer, Split> splitQueues = new HashMap<>();
 
     protected List<SKI.Combinator> combinators = new ArrayList<SKI.Combinator>(numOfParticles);
     protected Map<String, Integer> countMap = new HashMap<String, Integer>();
@@ -325,7 +329,11 @@ public class ParticleSystem {
         double zpotn = potn.element(icollision) + potn.element(jcollision) + knct.element(icollision) + knct.element(jcollision) - zknct;
         zpotn = lmass + rmass - zmass + zpotn;
         if (zpotn > 0) {
-            emissionQueues.put(i, new Emission(i));
+            if (result instanceof SKI.CompositiveCombinator comp && comp.breakup) {
+                splitQueues.put(i, new Split(i));
+            } else {
+                emissionQueues.put(i, new Emission(i));
+            }
         }
 
         combinators.set(i, result);
@@ -345,6 +353,14 @@ public class ParticleSystem {
 
         flag.set(i, 1.0);
 
+        population = countMap.values().stream().reduce(0, new BinaryOperator() {
+            @Override
+            public Object apply(Object o, Object o2) {
+                return ((Integer)o).intValue() + ((Integer)o2).intValue() ;
+            }
+        }).intValue();
+        diversity = countMap.size();
+
         System.out.println("==================================================================");
         System.out.println("Collision");
         System.out.println("time %f".formatted(t));
@@ -362,13 +378,9 @@ public class ParticleSystem {
         System.out.println("total potential %d: %f".formatted(counter, potn.sum()));
         System.out.println("------------------------------------------------------------------");
         System.out.println("time %f".formatted(t));
-        System.out.println("particles %d".formatted(countMap.values().stream().reduce(0, new BinaryOperator() {
-            @Override
-            public Object apply(Object o, Object o2) {
-                return ((Integer)o).intValue() + ((Integer)o2).intValue() ;
-            }
-        }).intValue()));
-        System.out.println("diversity %d".formatted(countMap.size()));
+
+        System.out.println("particles %d".formatted(population));
+        System.out.println("diversity %d".formatted(diversity));
         System.out.println("==================================================================");
         System.out.println("List");
         System.out.println("time %f".formatted(t));
@@ -443,6 +455,92 @@ public class ParticleSystem {
         }
     }
 
+    public class Split {
+        private int index;
+        public Split(int index) {
+            this.index = index;
+        }
+        void split(double dt) {
+            if (flag.element(index) <= 0) {
+                splitQueues.remove(index);
+            } else {
+                double potential = potn.element(index);
+                if (potential < 0.5) {
+                    splitQueues.remove(index);
+                } else {
+                    SKI.Combinator combinator = combinators.get(this.index);
+                    if (combinator instanceof SKI.CompositiveCombinator) {
+                        SKI.CompositiveCombinator cmbn = (SKI.CompositiveCombinator)combinator;
+                        SKI.Combinator left = cmbn.left;
+                        SKI.Combinator right = cmbn.right;
+                        double ml = left.mass();
+                        double mr = right.mass();
+                        double mo = ml + mr;
+                        double ko = knct.element(this.index);
+                        double po = potn.element(this.index);
+                        double energy = ko + po;
+                        double a = mr / (ml + mr);
+                        double b = ml / (ml + mr);
+                        double s = Math.sqrt(2 * potn.element(this.index) / cmbn.mass());
+                        if (cmbn.breakup) {
+                            double rx = Generators.uniform_n1p1.generate();
+                            double ry = Generators.uniform_n1p1.generate();
+                            double rz = Generators.uniform_n1p1.generate();
+                            double sqr = rx * rx + ry * ry + rz * rz;
+                            double sr = Math.sqrt(sqr);
+                            rx = rx / sr;
+                            ry = ry / sr;
+                            rz = rz / sr;
+
+                            double px = posn.element(this.index, 0);
+                            double py = posn.element(this.index, 1);
+                            double pz = posn.element(this.index, 2);
+                            double vx = velo.element(this.index, 0);
+                            double vy = velo.element(this.index, 1);
+                            double vz = velo.element(this.index, 2);
+                            double sqv = vx * vx + vy * vy + vz * vz;
+                            double sv = Math.sqrt(sqv);
+                            vx = vx / sv;
+                            vy = vy / sv;
+                            vz = vz / sv;
+
+                            double tx = (vy * rz - vz * ry) * s;
+                            double ty = (vz * rx - vx * rz) * s;
+                            double tz = (vx * ry - vy * rx) * s;
+
+                            double threshdt = collisionThreshhold * 1.1 / s;
+                            double dx = tx * threshdt;
+                            double dy = ty * threshdt;
+                            double dz = tz * threshdt;
+
+                            int l = availableIndex();
+                            update(l, left, left.mass(), px + dx, py + dy, pz + dz, vx + a * tx, vy + a * ty, vz + a * tz, 0);
+
+                            int r = availableIndex();
+                            update(r, right, right.mass(), px - dx, py - dy, pz - dz, vx - b * tx, vx - b * ty, vx - b * tz, 0);
+
+                            double p = energy - knct.element(l) - knct.element(r);
+                            potn.set(l, b * p);
+                            potn.set(r, a * p);
+
+                            clear(this.index);
+
+                            System.out.println("------------------------------------------------------------------");
+                            System.out.println("Split");
+                            System.out.println("time %f".formatted(t));
+                            System.out.println("split: %d -> %d, %d".formatted(this.index, l, r));
+                            System.out.println("cmbn: %s -> %s, %s".formatted(cmbn.script(), left.script(), right.script()));
+                            System.out.println("mass: %f -> %f, %f".formatted(mo, ml, mr));
+                            System.out.println("knct: %f -> %f, %f".formatted(ko, knct.element(l), knct.element(r)));
+                            System.out.println("potn: %f -> %f, %f".formatted(po, potn.element(l), potn.element(r)));
+                            System.out.println("------------------------------------------------------------------");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void emmitIota(double dt) {
         for (int i = 0; i < emitRate * dt; i++) {
             for (int key : new ArrayList<Integer>(emissionQueues.keySet())) {
@@ -474,14 +572,24 @@ public class ParticleSystem {
     }
 
     public void escapeIota(double dt) {
-        for (int i = 0; i < numOfParticles; i++) {
-            if (flag.element(i) > 0 && combinators.get(i) != null) {
-                String script = combinators.get(i).script();
-                if (!script.contains("S") && !script.contains("K") && !script.contains("I")) {
-                    if (Math.random() < escapeProb * dt) {
-                        clear(i);
+        if (t > 5000.0) {
+            for (int i = 0; i < numOfParticles; i++) {
+                if (flag.element(i) > 0 && combinators.get(i) != null) {
+                    String script = combinators.get(i).script();
+                    if (!script.contains("S") && !script.contains("K") && !script.contains("I")) {
+                        if (Math.random() < escapeProb * dt) {
+                            clear(i);
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    public void splitExec(double dt) {
+        for (int i = 0; i < emitRate * dt; i++) {
+            for (int key : new ArrayList<Integer>(splitQueues.keySet())) {
+                splitQueues.get(key).split(dt);
             }
         }
     }

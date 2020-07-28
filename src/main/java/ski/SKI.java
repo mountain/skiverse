@@ -217,11 +217,14 @@ public interface SKI {
                                     Combinator $1 = ctx.get("$1");
                                     Combinator $2 = ctx.get("$2");
                                     Combinator $3 = ctx.get("$3");
+                                    CompositiveCombinator result;
                                     if(detector.commit(this.script())) {
-                                        yield check(cons(cons($1, $3).eval(), cons($2, $3).eval()).eval());
+                                        result = (CompositiveCombinator)cons(cons($1, $3).eval(), cons($2, $3).eval());
                                     } else {
-                                        yield check(cons(cons($1, $3), cons($2, $3)).eval());
+                                        result = (CompositiveCombinator)cons(cons($1, $3), cons($2, $3));
                                     }
+                                    result.breakup = true;
+                                    yield check(result.eval());
                                 }
                                 case "(((ι, $1), $2), $3)" -> {
                                     Combinator $1 = ctx.get("$1");
