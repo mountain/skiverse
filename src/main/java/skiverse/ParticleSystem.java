@@ -21,7 +21,7 @@ public class ParticleSystem {
     public static double width = 64;
     public static int numOfParticles = 8192;
     public static double emitRate = 6.0;
-    public static double injectRate = 0.0;
+    public static double injectRate = 1.0;
     public static double escapeProb = 0.9;
     public static double collisionThreshhold = 0.1;
 
@@ -550,29 +550,30 @@ public class ParticleSystem {
     }
 
     public void injectIota(double dt) {
-        double count = injectRate * dt;
-        for (int i = 0; i < count; i++) {
-            int j = availableIndex();
-            SKI.Combinator iota = SKI.iota();
+        if (t > 5000.0) {
+            double count = injectRate * dt;
+            for (int i = 0; i < count; i++) {
+                int j = availableIndex();
+                SKI.Combinator iota = SKI.iota();
 
-            double px = Generators.uniform_01.generate() * width;
-            double py = Generators.uniform_01.generate() * width;
-            double pz = Generators.uniform_01.generate() * width;
-            double vx = Generators.uniform_n1p1.generate();
-            double vy = Generators.uniform_n1p1.generate();
-            double vz = Generators.uniform_n1p1.generate();
-            double sq = vx * vx + vy * vy + vz * vz;
-            double s = Math.sqrt(sq);
-            vx = vx / s;
-            vy = vy / s;
-            vz = vz / s;
+                double px = Generators.uniform_01.generate() * width;
+                double py = Generators.uniform_01.generate() * width;
+                double pz = Generators.uniform_01.generate() * width;
+                double vx = Generators.uniform_n1p1.generate();
+                double vy = Generators.uniform_n1p1.generate();
+                double vz = Generators.uniform_n1p1.generate();
+                double sq = vx * vx + vy * vy + vz * vz;
+                double s = Math.sqrt(sq);
+                vx = vx / s;
+                vy = vy / s;
+                vz = vz / s;
 
-            update(j, iota, iota.mass(), px, py, pz, vx, vy, vz, 0);
+                update(j, iota, iota.mass(), px, py, pz, vx, vy, vz, 0);
+            }
         }
     }
 
     public void escapeIota(double dt) {
-        if (t > 5000.0) {
             for (int i = 0; i < numOfParticles; i++) {
                 if (flag.element(i) > 0 && combinators.get(i) != null) {
                     String script = combinators.get(i).script();
@@ -583,7 +584,6 @@ public class ParticleSystem {
                     }
                 }
             }
-        }
     }
 
     public void splitExec(double dt) {
