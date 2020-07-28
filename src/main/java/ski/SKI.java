@@ -102,6 +102,7 @@ public interface SKI {
         public final Combinator left;
         public final Combinator right;
         public Potential potential;
+        public boolean breakup = false;
 
         CompositiveCombinator(Combinator left, Combinator right) {
             this.left = left;
@@ -150,6 +151,9 @@ public interface SKI {
                     if (!sa.equals(sb)) {
                         return val;
                     }
+                }
+                if (this.breakup && this.potential.val < 0) {
+                    this.breakup = false;
                 }
             } else {
                 if (ma > mb) {
@@ -230,7 +234,9 @@ public interface SKI {
                                     Combinator $2 = ctx.get("$2");
                                     Combinator $3 = ctx.get("$3");
                                     Combinator $4 = ctx.get("$4");
-                                    yield check(cons(cons($1, $2).eval(), cons($3, $4).eval()).eval());
+                                    CompositiveCombinator result = (CompositiveCombinator)cons(cons($1, $2).eval(), cons($3, $4).eval()).eval();
+                                    result.breakup = true;
+                                    yield check(result);
                                 }
                                 case "((($1, $2), $3), $4)" -> {
                                     Combinator $1 = ctx.get("$1").eval();
