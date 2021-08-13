@@ -1,5 +1,7 @@
 # Skiverse: A SKI universe
 
+[![DOI](https://zenodo.org/badge/280541515.svg)](https://zenodo.org/badge/latestdoi/280541515)
+
 How did life began? This is one of the biggest unanswered question of science, but is very hard to reproduce and verify.
 On the other hand, in computer science, [Von Neumann universal constructor](https://en.wikipedia.org/wiki/Von_Neumann_universal_constructor),
 as a self-replicating construction, is not very complex, comparing thier biological counterpart.
